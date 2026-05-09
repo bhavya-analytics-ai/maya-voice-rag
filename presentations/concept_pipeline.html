@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAYA · Sprint 6 Presentation Flow</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #080812;
+    --bg2: #0d0d22;
+    --blue: #00c8ff;
+    --cyan: #00ffe7;
+    --purple: #7b3fff;
+    --pink: #ff3fa4;
+    --green: #00ff88;
+    --yellow: #ffe600;
+    --red: #ff3b3b;
+    --corona: #0066b3;
+    --card-bg: rgba(0, 200, 255, 0.04);
+    --card-border: rgba(0, 200, 255, 0.18);
+    --glow: rgba(0, 200, 255, 0.35);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: #e0f4ff;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── HEADER ── */
+  #header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+    background: rgba(8,8,18,0.85);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(0,200,255,0.12);
+  }
+  .header-left {
+    display: flex; align-items: center; gap: 18px;
+  }
+  .corona-logo {
+    background: var(--corona);
+    color: white;
+    font-family: Arial, sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    padding: 6px 14px;
+    border-radius: 4px;
+    text-transform: lowercase;
+    box-shadow: 0 0 16px rgba(0, 102, 179, 0.4);
+    transition: transform 0.2s;
+  }
+  .corona-logo:hover { transform: scale(1.05); }
+  .maya-link {
+    font-size: 13px; font-weight: 700; letter-spacing: 3px;
+    color: var(--blue); text-transform: uppercase;
+    text-decoration: none;
+    padding: 4px 10px; border-radius: 6px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    cursor: pointer;
+    position: relative;
+  }
+  .maya-link:hover {
+    color: var(--cyan);
+    border-color: rgba(0, 255, 231, 0.4);
+    background: rgba(0, 255, 231, 0.05);
+    box-shadow: 0 0 20px rgba(0, 255, 231, 0.2);
+  }
+  .maya-link .launch-icon {
+    font-size: 10px; margin-left: 4px; opacity: 0.6;
+  }
+  .header-tagline {
+    font-size: 11px; color: rgba(255,255,255,0.35);
+    letter-spacing: 1.5px;
+    padding-left: 14px;
+    border-left: 1px solid rgba(0,200,255,0.15);
+  }
+  #header .badge {
+    font-size: 11px; letter-spacing: 2px;
+    background: rgba(0,200,255,0.1);
+    border: 1px solid rgba(0,200,255,0.3);
+    border-radius: 20px; padding: 4px 14px;
+    color: var(--cyan);
+  }
+  #header .status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: rgba(255,255,255,0.45);
+  }
+  .pulse-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulseGreen 1.6s ease-in-out infinite;
+  }
+  @keyframes pulseGreen { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(0.7)} }
+
+  /* ── CANVAS LAYER ── */
+  #pipelineCanvas {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ── MAIN SCENE ── */
+  #scene {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2;
+    overflow: hidden;
+  }
+
+  #pipeline-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 40px;
+    transform-origin: center center;
+    transition: transform 0.4s cubic-bezier(0.23,1,0.32,1);
+  }
+
+  /* ── CONNECTOR TUBE ── */
+  .connector {
+    width: 32px; height: 6px;
+    background: linear-gradient(90deg, rgba(0,200,255,0.15), rgba(0,200,255,0.4), rgba(0,200,255,0.15));
+    position: relative;
+    flex-shrink: 0;
+    border-radius: 3px;
+    overflow: visible;
+  }
+  .connector::after {
+    content: '';
+    position: absolute; top: 50%; left: 0; right: 0;
+    height: 2px; margin-top: -1px;
+    background: linear-gradient(90deg, transparent, var(--blue), transparent);
+    animation: flowPulse 2s linear infinite;
+  }
+  @keyframes flowPulse {
+    0%   { opacity: 0.2; transform: scaleX(0.3) translateX(-100%); }
+    100% { opacity: 0; transform: scaleX(0.3) translateX(400%); }
+  }
+
+  /* ── STAGE CARD ── */
+  .stage {
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 18px 14px 14px;
+    width: 118px;
+    min-height: 158px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.25s cubic-bezier(0.23,1,0.32,1),
+                box-shadow 0.25s ease,
+                border-color 0.25s ease,
+                background 0.25s ease;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(8px);
+  }
+  .stage::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 16px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0,200,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .stage:hover {
+    transform: translateY(-5px) scale(1.035);
+    border-color: rgba(0,200,255,0.55);
+    box-shadow: 0 0 28px rgba(0,200,255,0.22), 0 8px 32px rgba(0,0,0,0.4);
+    background: rgba(0,200,255,0.07);
+  }
+  .stage.active {
+    border-color: var(--cyan);
+    box-shadow: 0 0 40px rgba(0,255,231,0.35), 0 0 80px rgba(0,255,231,0.1);
+    background: rgba(0,255,231,0.06);
+  }
+
+  .stage-num {
+    position: absolute; top: 8px; left: 12px;
+    font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+    color: rgba(0,200,255,0.4);
+  }
+  .stage-icon {
+    font-size: 28px; line-height: 1;
+    filter: drop-shadow(0 0 8px currentColor);
+    margin-top: 4px;
+  }
+  .stage-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; text-align: center;
+    color: var(--blue);
+    line-height: 1.3;
+  }
+  .stage-sub {
+    font-size: 9px; color: rgba(255,255,255,0.5);
+    text-align: center; line-height: 1.45;
+  }
+  .stage-tag {
+    font-size: 8px; letter-spacing: 0.8px;
+    background: rgba(0,200,255,0.1);
+    border: 1px solid rgba(0,200,255,0.25);
+    border-radius: 8px; padding: 2px 7px;
+    color: var(--cyan);
+    margin-top: auto;
+    text-align: center;
+  }
+
+  /* ── TITLE STAGE (stage 1) ── */
+  .title-stage .stage-tag {
+    background: rgba(0,102,179,0.2);
+    border-color: rgba(0,102,179,0.5);
+    color: #7fc8ff;
+  }
+
+  /* ── PROBLEM STAGE (stage 2) ── */
+  .problem-stage {
+    border-color: rgba(255,59,59,0.3);
+    background: rgba(255,59,59,0.03);
+  }
+  .problem-stage .stage-title { color: #ff7070; }
+  .problem-stage .stage-tag {
+    background: rgba(255,59,59,0.1);
+    border-color: rgba(255,59,59,0.3);
+    color: #ff9090;
+  }
+
+  /* ── REACT AGENT LOOP ── */
+  .react-loop {
+    display: flex; flex-direction: column; gap: 3px; width: 100%; margin-top: 2px;
+  }
+  .react-step {
+    font-size: 8px; padding: 2px 6px; border-radius: 5px;
+    background: rgba(123,63,255,0.08);
+    border: 1px solid rgba(123,63,255,0.2);
+    color: rgba(255,255,255,0.45);
+    transition: all 0.3s;
+    text-align: center;
+  }
+  .react-step.lit {
+    color: #c4a4ff;
+    border-color: rgba(123,63,255,0.6);
+    background: rgba(123,63,255,0.18);
+    box-shadow: 0 0 8px rgba(123,63,255,0.3);
+  }
+
+  /* ── CHECKLIST (stage 3) ── */
+  .checklist {
+    display: flex; flex-direction: column; gap: 2px; width: 100%; margin-top: 2px;
+  }
+  .check-item {
+    font-size: 7.5px; color: rgba(0,255,136,0.65);
+    display: flex; align-items: center; gap: 4px;
+    line-height: 1.3;
+  }
+  .check-item::before {
+    content: '✓'; color: var(--green); font-weight: 700;
+  }
+
+  /* ── DEMO STAGE (stage 10) ── */
+  .demo-stage {
+    background: rgba(0,255,231,0.04);
+    border-color: rgba(0,255,231,0.25);
+  }
+  .demo-stage .stage-title { color: var(--cyan); }
+  .response-glow {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,255,231,0.5) 0%, transparent 70%);
+    animation: responseGlow 2s ease-in-out infinite;
+    margin-top: 2px;
+  }
+  @keyframes responseGlow {
+    0%,100% { transform: scale(0.9); opacity: 0.7; }
+    50%      { transform: scale(1.15); opacity: 1; }
+  }
+
+  /* ── GRAPHIFY STAGE ── */
+  .graph-mini {
+    position: relative;
+    width: 70px; height: 48px;
+    margin-top: 2px;
+  }
+  .graph-node {
+    position: absolute;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 6px var(--cyan);
+    animation: graphPulse 2.5s ease-in-out infinite;
+  }
+  @keyframes graphPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+
+  /* ── MCP PLUGS ── */
+  .mcp-plugs {
+    display: flex; gap: 3px; flex-wrap: wrap; justify-content: center;
+    width: 100%; margin-top: 4px;
+  }
+  .mcp-plug {
+    font-size: 7.5px;
+    background: rgba(123,63,255,0.1);
+    border: 1px solid rgba(123,63,255,0.3);
+    color: #c4a4ff;
+    padding: 2px 4px; border-radius: 4px;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── DETAIL MODAL ── */
+  #modal {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(8,8,18,0.88);
+    backdrop-filter: blur(20px);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  #modal.open { opacity: 1; pointer-events: all; }
+  #modal-card {
+    background: linear-gradient(145deg, rgba(0,200,255,0.07), rgba(0,0,0,0.3));
+    border: 1px solid rgba(0,200,255,0.35);
+    border-radius: 24px;
+    padding: 40px 44px;
+    max-width: 640px; width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    transform: scale(0.88) translateY(16px);
+    transition: transform 0.35s cubic-bezier(0.23,1,0.32,1);
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,200,255,0.15), 0 24px 80px rgba(0,0,0,0.6);
+  }
+  #modal.open #modal-card { transform: scale(1) translateY(0); }
+  #modal-close {
+    position: absolute; top: 16px; right: 20px;
+    font-size: 20px; color: rgba(255,255,255,0.3);
+    cursor: pointer; transition: color 0.2s;
+    background: none; border: none;
+    line-height: 1;
+  }
+  #modal-close:hover { color: var(--blue); }
+
+  /* ── MODAL SIDE NAV BUTTONS ── */
+  .modal-nav-btn {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(0, 200, 255, 0.08);
+    border: 1px solid rgba(0, 200, 255, 0.3);
+    color: var(--cyan);
+    font-size: 32px; font-weight: 300;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+    z-index: 210;
+    line-height: 1;
+    padding-bottom: 4px;
+  }
+  .modal-nav-btn:hover {
+    background: rgba(0, 255, 231, 0.15);
+    border-color: var(--cyan);
+    box-shadow: 0 0 24px rgba(0, 255, 231, 0.35);
+    transform: translateY(-50%) scale(1.08);
+  }
+  .modal-nav-btn.left { left: 32px; }
+  .modal-nav-btn.right { right: 32px; }
+
+  /* ── MODAL FOOTER NAV ── */
+  #modal-footer-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 24px; padding-top: 16px;
+    border-top: 1px solid rgba(0, 200, 255, 0.12);
+  }
+  .modal-foot-btn {
+    background: rgba(0, 200, 255, 0.08);
+    border: 1px solid rgba(0, 200, 255, 0.25);
+    color: var(--blue);
+    padding: 7px 16px; border-radius: 8px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .modal-foot-btn:hover {
+    background: rgba(0, 255, 231, 0.12);
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+  #modal-counter {
+    font-size: 11px; letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.45);
+    font-weight: 600;
+  }
+  #modal-icon { font-size: 48px; margin-bottom: 12px; display: block; }
+  #modal-title {
+    font-size: 22px; font-weight: 700; letter-spacing: 2px;
+    color: var(--blue); text-transform: uppercase; margin-bottom: 6px;
+  }
+  #modal-subtitle {
+    font-size: 13px; color: rgba(255,255,255,0.45);
+    margin-bottom: 20px; letter-spacing: 0.5px;
+  }
+  #modal-body { font-size: 13px; line-height: 1.75; color: rgba(255,255,255,0.7); }
+  #modal-body strong { color: var(--cyan); }
+  #modal-body .tag {
+    display: inline-block;
+    background: rgba(0,200,255,0.1);
+    border: 1px solid rgba(0,200,255,0.25);
+    border-radius: 10px; padding: 3px 10px;
+    font-size: 11px; color: var(--cyan);
+    margin: 3px 2px;
+  }
+  #modal-body .tag.purple { background: rgba(123,63,255,0.1); border-color: rgba(123,63,255,0.3); color: #c4a4ff; }
+  #modal-body .tag.green { background: rgba(0,255,136,0.08); border-color: rgba(0,255,136,0.25); color: var(--green); }
+  #modal-body .tag.red { background: rgba(255,59,59,0.1); border-color: rgba(255,59,59,0.3); color: #ff8080; }
+  #modal-body code {
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px; color: #a8d8ea;
+    background: rgba(0,200,255,0.07);
+    padding: 1px 6px; border-radius: 4px;
+  }
+  .modal-stat-row {
+    display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap;
+  }
+  .modal-stat {
+    flex: 1; min-width: 110px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(0,200,255,0.12);
+    border-radius: 12px; padding: 12px 14px; text-align: center;
+  }
+  .modal-stat .val { font-size: 22px; font-weight: 700; color: var(--cyan); }
+  .modal-stat .lbl { font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 1px; margin-top: 2px; }
+
+  /* ── TICKER ── */
+  #ticker {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(8,8,18,0.9);
+    border-top: 1px solid rgba(0,200,255,0.1);
+    padding: 9px 20px;
+    display: flex; align-items: center; gap: 14px;
+    font-size: 11.5px; overflow: hidden;
+  }
+  #ticker .label {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    color: var(--blue); background: rgba(0,200,255,0.1);
+    border: 1px solid rgba(0,200,255,0.25);
+    border-radius: 4px; padding: 2px 8px; white-space: nowrap;
+  }
+  #ticker-inner {
+    display: flex; gap: 0; white-space: nowrap;
+    animation: tickerScroll 45s linear infinite;
+  }
+  @keyframes tickerScroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .tick-item {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: rgba(255,255,255,0.45); padding: 0 30px;
+  }
+  .tick-item::before {
+    content: '◆'; font-size: 7px; color: var(--blue); opacity: 0.5;
+  }
+  .tick-q { color: rgba(0,200,255,0.7); }
+
+  /* ── LEGEND ── */
+  #legend {
+    position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
+    z-index: 50; display: flex; flex-direction: column; gap: 10px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 9.5px; color: rgba(255,255,255,0.3);
+  }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── GRID LINES ── */
+  #grid-overlay {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* ── SCAN LINE ── */
+  #scanline {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.04) 2px,
+      rgba(0,0,0,0.04) 4px
+    );
+  }
+
+  /* ── STAGE GLOW RING ── */
+  .stage::after {
+    content: '';
+    position: absolute; inset: -1px;
+    border-radius: 17px;
+    opacity: 0;
+    border: 1px solid var(--cyan);
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .stage.active::after { opacity: 1; animation: ringPulse 2s ease-in-out infinite; }
+  @keyframes ringPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,255,231,0.3); }
+    50%      { box-shadow: 0 0 0 6px rgba(0,255,231,0); }
+  }
+
+  /* speed control */
+  #controls {
+    position: fixed; left: 20px; top: 50%; transform: translateY(-50%);
+    z-index: 50; display: flex; flex-direction: column; gap: 10px;
+  }
+  .ctrl-btn {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(0,200,255,0.07);
+    border: 1px solid rgba(0,200,255,0.2);
+    color: var(--blue); font-size: 15px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .ctrl-btn:hover { background: rgba(0,200,255,0.15); border-color: var(--blue); }
+</style>
+</head>
+<body>
+
+<div id="grid-overlay"></div>
+<div id="scanline"></div>
+<canvas id="pipelineCanvas"></canvas>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="header-left">
+    <div class="corona-logo">corona</div>
+    <a href="http://localhost:8000" target="_blank" class="maya-link">
+      MAYA<span class="launch-icon">↗</span>
+    </a>
+    <div class="header-tagline">SPRINT 6 · PRESENTATION FLOW</div>
+  </div>
+  <div class="badge">10 SLIDES</div>
+  <div class="status">
+    <div class="pulse-dot"></div>
+    LIVE · COLOMBIA REGION
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div id="controls">
+  <button class="ctrl-btn" id="btn-slower" title="Slower">⏵</button>
+  <button class="ctrl-btn" id="btn-pause" title="Pause/Play">⏸</button>
+  <button class="ctrl-btn" id="btn-faster" title="Faster">⏩</button>
+</div>
+
+<!-- LEGEND -->
+<div id="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Flow</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>Active</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Shipped</div>
+</div>
+
+<!-- PIPELINE -->
+<div id="scene">
+  <div id="pipeline-wrapper">
+
+    <!-- 1. TITLE -->
+    <div class="stage title-stage" id="stage-0" onclick="openModal(0)">
+      <div class="stage-num">01</div>
+      <div class="stage-icon">🎯</div>
+      <div class="stage-title">Title</div>
+      <div class="stage-sub">Agent-powered<br>AI chatbot<br>for Corona</div>
+      <div class="stage-tag">Sprint 6</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 2. THE PROBLEM -->
+    <div class="stage problem-stage" id="stage-1" onclick="openModal(1)">
+      <div class="stage-num">02</div>
+      <div class="stage-icon">⚠️</div>
+      <div class="stage-title">The<br>Problem</div>
+      <div class="stage-sub">Sprint 5 gave<br>generic answers<br>2 root causes</div>
+      <div class="stage-tag">Diagnosis</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 3. WHAT SPRINT 6 BUILT -->
+    <div class="stage" id="stage-2" onclick="openModal(2)">
+      <div class="stage-num">03</div>
+      <div class="stage-icon">📋</div>
+      <div class="stage-title">Sprint 6<br>Built</div>
+      <div class="checklist">
+        <div class="check-item">Agent</div>
+        <div class="check-item">5 Tools</div>
+        <div class="check-item">Vision OCR</div>
+        <div class="check-item">MCP</div>
+      </div>
+      <div class="stage-tag">8 items</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 4. DATA & INGESTION -->
+    <div class="stage" id="stage-3" onclick="openModal(3)">
+      <div class="stage-num">04</div>
+      <div class="stage-icon">📥</div>
+      <div class="stage-title">Data &<br>Ingestion</div>
+      <div class="stage-sub">PDFs re-OCRd<br>GPT-4o vision<br>page by page</div>
+      <div class="stage-tag">1,100+ chunks</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 5. PIPELINE -->
+    <div class="stage" id="stage-4" onclick="openModal(4)">
+      <div class="stage-num">05</div>
+      <div class="stage-icon">🔄</div>
+      <div class="stage-title">Pipeline</div>
+      <div class="stage-sub">End-to-end<br>data flow<br>8 stages</div>
+      <div class="stage-tag">Live route</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 6. ACCURACY FIX -->
+    <div class="stage" id="stage-5" onclick="openModal(5)">
+      <div class="stage-num">06</div>
+      <div class="stage-icon">🎯</div>
+      <div class="stage-title">Accuracy<br>Fix</div>
+      <div class="stage-sub">PRODUCT_<br>SOURCE_MAP<br>filter search</div>
+      <div class="stage-tag">No more generic</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 7. LANGGRAPH REACT AGENT -->
+    <div class="stage" id="stage-6" onclick="openModal(6)">
+      <div class="stage-num">07</div>
+      <div class="stage-icon">🧠</div>
+      <div class="stage-title">ReAct<br>Agent</div>
+      <div class="react-loop">
+        <div class="react-step" id="react-0">💭 Thought</div>
+        <div class="react-step" id="react-1">⚡ Action</div>
+        <div class="react-step" id="react-2">👁 Observe</div>
+      </div>
+      <div class="stage-tag">5 tools</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 8. GRAPHIFY (DEV-SIDE CODE AUDIT) -->
+    <div class="stage" id="stage-7" onclick="openModal(7)">
+      <div class="stage-num">08</div>
+      <div class="stage-icon">🕸️</div>
+      <div class="stage-title">Code<br>Audit</div>
+      <div class="graph-mini">
+        <div class="graph-node" style="top:4px;  left:14px; animation-delay:0s"></div>
+        <div class="graph-node" style="top:18px; left:30px; animation-delay:0.3s"></div>
+        <div class="graph-node" style="top:8px;  left:48px; animation-delay:0.6s"></div>
+        <div class="graph-node" style="top:28px; left:8px;  animation-delay:0.9s"></div>
+        <div class="graph-node" style="top:32px; left:40px; animation-delay:1.2s"></div>
+        <div class="graph-node" style="top:38px; left:56px; animation-delay:1.5s"></div>
+      </div>
+      <div class="stage-tag">Graphify · dev tool</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 9. MCP SERVER -->
+    <div class="stage" id="stage-8" onclick="openModal(8)">
+      <div class="stage-num">09</div>
+      <div class="stage-icon">🔌</div>
+      <div class="stage-title">MCP<br>Server</div>
+      <div class="mcp-plugs">
+        <div class="mcp-plug">weather</div>
+        <div class="mcp-plug">search</div>
+        <div class="mcp-plug">query</div>
+        <div class="mcp-plug">table</div>
+        <div class="mcp-plug">sentiment</div>
+        <div class="mcp-plug">code</div>
+      </div>
+      <div class="stage-tag">6 tools · fastmcp</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 10. RESEARCH KEY AREAS -->
+    <div class="stage demo-stage" id="stage-9" onclick="openModal(9)">
+      <div class="stage-num">10</div>
+      <div class="stage-icon">🔬</div>
+      <div class="stage-title">Research<br>Areas</div>
+      <div class="stage-sub">MCP ✓ shipped<br>Multi-Agent<br>studied</div>
+      <div class="stage-tag">Prof required</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TICKER -->
+<div id="ticker">
+  <div class="label">DEMO QUESTIONS</div>
+  <div id="ticker-inner"></div>
+</div>
+
+<!-- MODAL -->
+<div id="modal" onclick="closeModalOnBg(event)">
+  <button class="modal-nav-btn left" onclick="event.stopPropagation(); prevModal();" title="Previous (←)">‹</button>
+  <div id="modal-card" onclick="event.stopPropagation()">
+    <button id="modal-close" onclick="closeModal()">✕</button>
+    <span id="modal-icon"></span>
+    <div id="modal-title"></div>
+    <div id="modal-subtitle"></div>
+    <div id="modal-body"></div>
+    <div id="modal-footer-nav">
+      <button class="modal-foot-btn" onclick="prevModal()">← Prev</button>
+      <div id="modal-counter">1 / 10</div>
+      <button class="modal-foot-btn" onclick="nextModal()">Next →</button>
+    </div>
+  </div>
+  <button class="modal-nav-btn right" onclick="event.stopPropagation(); nextModal();" title="Next (→)">›</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════════
+const QUESTIONS = [
+  "How do I install the Sanitario Nyren?",
+  "What are the technical specs of the Nyren?",
+  "What are the maintenance instructions for the Aluvia Plus?",
+  "What's the best toilet for a small bathroom?",
+  "Where can I buy Corona toilets?",
+  "Compare Nyren vs Aluvia dimensions",
+  "What's the water consumption of the Cima?",
+  "Real-time web search across the web",
+  "Which Corona toilet has the lowest defect rate?",
+  "Show me the sentiment breakdown for the Nyren",
+];
+
+const MODAL_DATA = [
+  {
+    icon: "🎯",
+    title: "Slide 1 · Title",
+    subtitle: "MAYA · From RAG Chain to Full ReAct Agent",
+    body: `
+      <p>The opening frame: <strong>MAYA · Agent-Powered AI Chatbot for Corona · Sprint 6</strong>.</p>
+      <p style="margin-top:12px">Built for Corona (Colombia) by a team of 4 under Juan Jaramillo and Juan Felipe Mansalvo. Sprint 6 is where MAYA went from a RAG chain that gave generic answers to a full LangGraph ReAct agent with tools, vision OCR, and its own MCP server.</p>
+      <div style="margin-top:14px">
+        <span class="tag">Bhavya Pandya</span>
+        <span class="tag">Abhishek Raval</span>
+        <span class="tag">Tirth Bharodiya</span>
+        <span class="tag">Gurleen Sabharwal</span>
+      </div>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">4</div><div class="lbl">Team</div></div>
+        <div class="modal-stat"><div class="val">6</div><div class="lbl">Sprints</div></div>
+        <div class="modal-stat"><div class="val">221</div><div class="lbl">Real reviews</div></div>
+      </div>
+    `
+  },
+  {
+    icon: "⚠️",
+    title: "Slide 2 · The Problem",
+    subtitle: "Why Sprint 5 gave generic answers — two root causes",
+    body: `
+      <p>Sprint 5 shipped a working RAG chain but answers were useless. Ask "How do I install the Nyren?" → <em>"Please refer to the installation instructions that come with your product."</em></p>
+      <p style="margin-top:14px"><strong>Two root causes:</strong></p>
+      <div style="margin-top:10px; padding:12px 14px; border-radius:10px; background:rgba(255,59,59,0.06); border:1px solid rgba(255,59,59,0.2)">
+        <strong style="color:#ff8080">1 · Empty PDF chunks</strong><br>
+        <span style="font-size:12px;color:rgba(255,255,255,0.5)">The 3 product PDFs were image-based scans. PyMuPDF extracted ~3 words. ChromaDB stored empty chunks.</span>
+      </div>
+      <div style="margin-top:8px; padding:12px 14px; border-radius:10px; background:rgba(255,59,59,0.06); border:1px solid rgba(255,59,59,0.2)">
+        <strong style="color:#ff8080">2 · Random retrieval order</strong><br>
+        <span style="font-size:12px;color:rgba(255,255,255,0.5)"><code>vectorstore.get()</code> returns chunks by insertion order, not relevance. Chunk 0 = cover page. LLM got wrong context every time.</span>
+      </div>
+      <p style="margin-top:14px">No data + wrong chunks = no real answer.</p>
+    `
+  },
+  {
+    icon: "📋",
+    title: "Slide 3 · What Sprint 6 Built",
+    subtitle: "The 8-item delivery checklist",
+    body: `
+      <p>Every professor requirement, shipped and verified:</p>
+      <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:8px">
+        <div style="padding:10px 12px; border-radius:10px; background:rgba(0,255,136,0.04); border:1px solid rgba(0,255,136,0.2)">
+          <strong style="color:var(--green);font-size:12px">✓ ReAct Agent</strong><br>
+          <span style="font-size:11px;color:rgba(255,255,255,0.5)">LangGraph create_react_agent</span>
+        </div>
+        <div style="padding:10px 12px; border-radius:10px; background:rgba(0,255,136,0.04); border:1px solid rgba(0,255,136,0.2)">
+          <strong style="color:var(--green);font-size:12px">✓ 5 Tools</strong><br>
+          <span style="font-size:11px;color:rgba(255,255,255,0.5)">weather, web, db, table, code</span>
+        </div>
+        <div style="padding:10px 12px; border-radius:10px; background:rgba(0,255,136,0.04); border:1px solid rgba(0,255,136,0.2)">
+          <strong style="color:var(--green);font-size:12px">✓ Vision OCR</strong><br>
+          <span style="font-size:11px;color:rgba(255,255,255,0.5)">GPT-4o-mini on image PDFs</span>
+        </div>
+        <div style="padding:10px 12px; border-radius:10px; background:rgba(0,255,136,0.04); border:1px solid rgba(0,255,136,0.2)">
+          <strong style="color:var(--green);font-size:12px">✓ Source Map</strong><br>
+          <span style="font-size:11px;color:rgba(255,255,255,0.5)">Filtered similarity search</span>
+        </div>
+        <div style="padding:10px 12px; border-radius:10px; background:rgba(0,255,136,0.04); border:1px solid rgba(0,255,136,0.2)">
+          <strong style="color:var(--green);font-size:12px">✓ LangSmith</strong><br>
+          <span style="font-size:11px;color:rgba(255,255,255,0.5)">Env fix at top of app.py</span>
+        </div>
+        <div style="padding:10px 12px; border-radius:10px; background:rgba(0,255,136,0.04); border:1px solid rgba(0,255,136,0.2)">
+          <strong style="color:var(--green);font-size:12px">✓ Graphify</strong><br>
+          <span style="font-size:11px;color:rgba(255,255,255,0.5)">186 nodes over codebase</span>
+        </div>
+        <div style="padding:10px 12px; border-radius:10px; background:rgba(0,255,136,0.04); border:1px solid rgba(0,255,136,0.2)">
+          <strong style="color:var(--green);font-size:12px">✓ MCP Server</strong><br>
+          <span style="font-size:11px;color:rgba(255,255,255,0.5)">fastmcp stdio, 6 tools</span>
+        </div>
+        <div style="padding:10px 12px; border-radius:10px; background:rgba(0,255,136,0.04); border:1px solid rgba(0,255,136,0.2)">
+          <strong style="color:var(--green);font-size:12px">✓ Injection Guard</strong><br>
+          <span style="font-size:11px;color:rgba(255,255,255,0.5)">8 regex patterns, kept from S5</span>
+        </div>
+      </div>
+    `
+  },
+  {
+    icon: "📥",
+    title: "Slide 4 · Data & Ingestion",
+    subtitle: "Vision OCR fix — 3 image-based PDFs now fully indexed",
+    body: `
+      <p>All 3 product PDFs are image-based scans. PyMuPDF extracted ~0 text. Fixed by re-ingesting every page through <strong>GPT-4o-mini vision</strong>: page → PNG → vision prompt → text chunks.</p>
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:6px">
+        <div style="display:flex; justify-content:space-between; padding:8px 12px; border-radius:8px; background:rgba(0,200,255,0.05); border:1px solid rgba(0,200,255,0.15); font-size:12px">
+          <span>Nyren Installation Guide (32p)</span>
+          <span><span style="color:#ff8080">~5</span> → <strong style="color:var(--green)">162</strong></span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:8px 12px; border-radius:8px; background:rgba(0,200,255,0.05); border:1px solid rgba(0,200,255,0.15); font-size:12px">
+          <span>Nyren Ficha Técnica</span>
+          <span><span style="color:#ff8080">0</span> → <strong style="color:var(--green)">7</strong></span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:8px 12px; border-radius:8px; background:rgba(0,200,255,0.05); border:1px solid rgba(0,200,255,0.15); font-size:12px">
+          <span>Aluvia Plus RD Spec Sheet</span>
+          <span><span style="color:#ff8080">5</span> → <strong style="color:var(--green)">17</strong></span>
+        </div>
+      </div>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">1,100+</div><div class="lbl">Total chunks</div></div>
+        <div class="modal-stat"><div class="val">186</div><div class="lbl">From Nyren alone</div></div>
+        <div class="modal-stat"><div class="val">text-3-small</div><div class="lbl">Embeddings</div></div>
+      </div>
+    `
+  },
+  {
+    icon: "🔄",
+    title: "Slide 5 · Pipeline",
+    subtitle: "Full 8-stage data flow — user question to grounded answer",
+    body: `
+      <p>Every question flows through the same eight stages, fully traced in LangSmith:</p>
+      <div style="margin-top:14px; font-family:'Courier New',monospace; font-size:12px; line-height:2; color:rgba(255,255,255,0.6)">
+        <span style="color:var(--cyan)">User Input</span> → <span style="color:#ff8080">Injection Guard</span> → <span style="color:#c4a4ff">ReAct Agent</span><br>
+        → <span style="color:var(--blue)">Tool Selection</span> → <span style="color:var(--cyan)">ChromaDB</span><br>
+        → <span style="color:var(--blue)">GPT-4o-mini</span> → <span style="color:#c4a4ff">LangSmith Trace</span> → <span style="color:var(--green)">Response</span>
+      </div>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">&lt;3s</div><div class="lbl">End-to-end</div></div>
+        <div class="modal-stat"><div class="val">1–3</div><div class="lbl">Agent iterations</div></div>
+        <div class="modal-stat"><div class="val">100%</div><div class="lbl">Traced</div></div>
+      </div>
+      <p style="margin-top:14px">Customer mode is safe by default: system prompt blocks defect data. Analyst mode unlocks with password.</p>
+    `
+  },
+  {
+    icon: "🎯",
+    title: "Slide 6 · The Accuracy Fix",
+    subtitle: "PRODUCT_SOURCE_MAP + similarity_search with filter",
+    body: `
+      <p>The biggest win. When a question mentions a product + technical keyword (install/spec/maintenance), we skip generic search and retrieve <strong>directly from that product's source file</strong>, ranked by relevance to the question.</p>
+      <div style="margin-top:14px; background:rgba(0,0,0,0.3); border:1px solid rgba(0,200,255,0.15); border-radius:10px; padding:12px; font-family:'Courier New',monospace; font-size:11px; line-height:1.7; color:rgba(255,255,255,0.7)">
+        PRODUCT_SOURCE_MAP = {<br>
+        &nbsp;&nbsp;<span style="color:var(--cyan)">"nyren"</span>:   [nyren-instalacion.pdf, ...],<br>
+        &nbsp;&nbsp;<span style="color:var(--cyan)">"aluvia"</span>:  [Aluvia_Plus.docx, Aluvia-RD.pdf],<br>
+        &nbsp;&nbsp;<span style="color:var(--cyan)">"cascade"</span>: [Sanitario_Cascade.docx],<br>
+        &nbsp;&nbsp;<span style="color:var(--cyan)">"cima"</span>:    [Sanitario_Cima.docx],<br>
+        }<br><br>
+        ranked = vectorstore.<span style="color:var(--green)">similarity_search</span>(<br>
+        &nbsp;&nbsp;question, k=20, <strong style="color:var(--yellow)">filter={"source": src}</strong><br>
+        )
+      </div>
+      <p style="margin-top:14px">Verified: Nyren install steps, Aluvia maintenance, Cascade specs, Cima dimensions — all return real data now.</p>
+      <div style="margin-top:10px">
+        <span class="tag red">.get() was wrong</span>
+        <span class="tag green">similarity + filter</span>
+      </div>
+    `
+  },
+  {
+    icon: "🧠",
+    title: "Slide 7 · LangGraph ReAct Agent",
+    subtitle: "Thought → Action → Observation loop with 5 tools",
+    body: `
+      <p>Replaced the RAG chain with a full reasoning agent using <code>langgraph.prebuilt.create_react_agent</code>. The agent thinks before acting, visible in LangSmith as a Thought → Action → Observation loop.</p>
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px">
+        <div style="padding:10px 14px; border-radius:10px; background:rgba(123,63,255,0.1); border:1px solid rgba(123,63,255,0.3)">
+          <strong style="color:#c4a4ff">💭 Thought</strong><br>
+          <span style="font-size:12px;color:rgba(255,255,255,0.5)">LLM reasons about what it needs and which tool to call.</span>
+        </div>
+        <div style="padding:10px 14px; border-radius:10px; background:rgba(0,200,255,0.06); border:1px solid rgba(0,200,255,0.2)">
+          <strong style="color:var(--blue)">⚡ Action</strong><br>
+          <span style="font-size:12px;color:rgba(255,255,255,0.5)">Dispatches a tool call with structured parameters.</span>
+        </div>
+        <div style="padding:10px 14px; border-radius:10px; background:rgba(0,255,136,0.05); border:1px solid rgba(0,255,136,0.15)">
+          <strong style="color:var(--green)">👁 Observation</strong><br>
+          <span style="font-size:12px;color:rgba(255,255,255,0.5)">Tool result returned; loop continues or terminates with final answer.</span>
+        </div>
+      </div>
+      <p style="margin-top:14px">5 tools wired in:</p>
+      <div style="margin-top:6px">
+        <span class="tag">🌤 get_weather</span>
+        <span class="tag">🔍 web_search</span>
+        <span class="tag">💬 query_products</span>
+        <span class="tag">📊 generate_product_table</span>
+        <span class="tag">💻 execute_code</span>
+      </div>
+    `
+  },
+  {
+    icon: "🕸️",
+    title: "Slide 8 · Code Audit · Graphify",
+    subtitle: "Dev-side tool we ran on our own codebase — not part of the runtime chatbot",
+    body: `
+      <p><strong>What this is:</strong> Graphify is a static code-analysis tool. We ran it on our project folder to build a graph over <strong>our own code and docs</strong> so we could see what we built.</p>
+      <p style="margin-top:10px"><strong>What it is NOT:</strong> it's not a tool MAYA calls at runtime. GPT-4o-mini never touches this graph. The chatbot doesn't know Graphify exists.</p>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">186</div><div class="lbl">Nodes</div></div>
+        <div class="modal-stat"><div class="val">236</div><div class="lbl">Edges</div></div>
+        <div class="modal-stat"><div class="val">23</div><div class="lbl">Communities</div></div>
+      </div>
+      <p style="margin-top:16px"><strong>God nodes</strong> (most connected in our code):</p>
+      <div style="margin-top:8px">
+        <span class="tag">ask() — 14 edges</span>
+        <span class="tag">Sanitario Aluvia Plus — 10 edges</span>
+        <span class="tag">run_liability_radar() — 9 edges</span>
+      </div>
+      <p style="margin-top:14px"><strong>Insight the graph surfaced:</strong> <code>run_liability_radar()</code> and <code>query_products()</code> both call the same <code>_vectorstore</code> global. The radar IS the DB query tool with classification on top — not a separate system. We wouldn't have spotted this from grepping.</p>
+      <p style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.45)">Output: <code>graphify-out/graph.html</code> · <code>graph.json</code> · <code>GRAPH_REPORT.md</code></p>
+      <div style="margin-top:12px">
+        <span class="tag green">Dev-side audit</span>
+        <span class="tag">Static analysis</span>
+        <span class="tag">Not runtime</span>
+      </div>
+    `
+  },
+  {
+    icon: "🔌",
+    title: "Slide 9 · MCP Server",
+    subtitle: "6 tools exposed via fastmcp stdio — connect from any MCP client",
+    body: `
+      <p><strong>We didn't just research MCP — we shipped it.</strong> <code>mcp_server.py</code> exposes MAYA's tools as a standard Model Context Protocol server that any AI client (Claude Desktop, Cursor, custom) can connect to.</p>
+      <div style="margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:6px">
+        <div style="padding:8px 10px; border-radius:8px; background:rgba(123,63,255,0.08); border:1px solid rgba(123,63,255,0.25); font-size:11px"><strong style="color:#c4a4ff">🌤 get_weather</strong></div>
+        <div style="padding:8px 10px; border-radius:8px; background:rgba(123,63,255,0.08); border:1px solid rgba(123,63,255,0.25); font-size:11px"><strong style="color:#c4a4ff">🔍 web_search</strong></div>
+        <div style="padding:8px 10px; border-radius:8px; background:rgba(123,63,255,0.08); border:1px solid rgba(123,63,255,0.25); font-size:11px"><strong style="color:#c4a4ff">💬 query_corona_products</strong></div>
+        <div style="padding:8px 10px; border-radius:8px; background:rgba(123,63,255,0.08); border:1px solid rgba(123,63,255,0.25); font-size:11px"><strong style="color:#c4a4ff">📊 generate_product_table</strong></div>
+        <div style="padding:8px 10px; border-radius:8px; background:rgba(123,63,255,0.08); border:1px solid rgba(123,63,255,0.25); font-size:11px"><strong style="color:#c4a4ff">😊 get_product_sentiment</strong></div>
+        <div style="padding:8px 10px; border-radius:8px; background:rgba(123,63,255,0.08); border:1px solid rgba(123,63,255,0.25); font-size:11px"><strong style="color:#c4a4ff">💻 execute_code</strong></div>
+      </div>
+      <p style="margin-top:14px"><strong>Without MCP:</strong> tools hardcoded inside the agent — locked to MAYA.</p>
+      <p style="margin-top:6px"><strong>With MCP:</strong> tools live on a server — any AI client connects and uses them.</p>
+      <div style="margin-top:12px">
+        <span class="tag purple">fastmcp</span>
+        <span class="tag purple">stdio transport</span>
+        <span class="tag purple">Claude Desktop ready</span>
+      </div>
+      <p style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.45)">Run: <code>python mcp_server.py</code></p>
+    `
+  },
+  {
+    icon: "🔬",
+    title: "Slide 10 · Research Key Areas",
+    subtitle: "The two research topics the professor assigned — MCP and Multi-Agent",
+    body: `
+      <p>Sprint 6 asked us to research two concepts. We went further on one of them.</p>
+
+      <div style="margin-top:18px; padding:14px 16px; border-radius:12px; background:rgba(123,63,255,0.08); border:1px solid rgba(123,63,255,0.3)">
+        <strong style="color:#c4a4ff; font-size:14px">🔌 MCP · Model Context Protocol</strong>
+        <span class="tag green" style="margin-left:8px">SHIPPED</span>
+        <p style="margin-top:10px; font-size:12.5px; line-height:1.7; color:rgba(255,255,255,0.7)">
+          Anthropic's open standard for connecting AI models to external tool servers. Instead of hardcoding tools inside one agent, MCP lets tools live on a separate server that <em>any</em> MCP-compatible client can connect to — Claude Desktop, Cursor, custom agents, all of them.
+        </p>
+        <p style="margin-top:8px; font-size:12.5px; line-height:1.7; color:rgba(255,255,255,0.7)">
+          <strong>Why it matters:</strong> decoupling. MAYA's logic doesn't own the tools anymore — the MCP server does. If we built a new agent tomorrow, it could reuse all six tools out of the box.
+        </p>
+        <p style="margin-top:8px; font-size:12.5px; color:rgba(255,255,255,0.6)">
+          <strong style="color:var(--cyan)">What we shipped:</strong> <code>mcp_server.py</code> with 6 tools via fastmcp stdio transport. Claude Desktop config wired. Run it: <code>python mcp_server.py</code>.
+        </p>
+      </div>
+
+      <div style="margin-top:14px; padding:14px 16px; border-radius:12px; background:rgba(0,200,255,0.06); border:1px solid rgba(0,200,255,0.25)">
+        <strong style="color:var(--blue); font-size:14px">🤝 Multi-Agent Systems</strong>
+        <span class="tag" style="margin-left:8px">STUDIED</span>
+        <p style="margin-top:10px; font-size:12.5px; line-height:1.7; color:rgba(255,255,255,0.7)">
+          Instead of one general-purpose agent, you split work across multiple specialized agents coordinated by an orchestrator. Each agent has its own role, tools, and system prompt.
+        </p>
+        <p style="margin-top:8px; font-size:12.5px; line-height:1.7; color:rgba(255,255,255,0.7)">
+          <strong>How it'd apply to MAYA:</strong>
+        </p>
+        <ul style="margin-top:6px; padding-left:18px; font-size:12px; line-height:1.8; color:rgba(255,255,255,0.65)">
+          <li><strong style="color:var(--cyan)">Customer Agent</strong> — warm, safe, product support only</li>
+          <li><strong style="color:var(--cyan)">Analyst Agent</strong> — full data, charts, tables, defect analysis</li>
+          <li><strong style="color:var(--cyan)">Orchestrator node</strong> — routes based on auth state + question type</li>
+        </ul>
+        <p style="margin-top:8px; font-size:12.5px; color:rgba(255,255,255,0.6)">
+          <strong>Framework:</strong> LangGraph supports multi-agent natively — nodes = agents, edges = handoffs. Future work.
+        </p>
+      </div>
+
+      <p style="margin-top:16px; font-size:12px; color:rgba(255,255,255,0.45); text-align:center; font-style:italic">
+        Click <strong style="color:var(--cyan)">MAYA</strong> in the top-left to launch the live demo.
+      </p>
+    `
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// CANVAS — PARTICLE SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+const canvas = document.getElementById('pipelineCanvas');
+const ctx = canvas.getContext('2d');
+
+const STAGE_COUNT = 10;
+
+let W, H;
+let paused = false;
+let speed = 1.0;
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Stage positions (updated each frame from DOM)
+let stageRects = [];
+
+function getStageRects() {
+  stageRects = [];
+  for (let i = 0; i < STAGE_COUNT; i++) {
+    const el = document.getElementById('stage-' + i);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    stageRects.push({ x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width/2, cy: r.top + r.height/2 });
+  }
+}
+
+// Particle class
+class Particle {
+  constructor() { this.reset(); }
+  reset() {
+    this.stageIdx = 0;
+    this.progress = 0;
+    this.size = 3.5 + Math.random() * 2.5;
+    this.trail = [];
+    this.color = Math.random() < 0.15 ? '#ff3fa4' : (Math.random() < 0.2 ? '#00ffe7' : '#00c8ff');
+    this.alpha = 0.85 + Math.random() * 0.15;
+    this.delay = Math.random() * 150;
+    this.active = false;
+  }
+
+  update() {
+    if (this.delay > 0) { this.delay -= speed; return; }
+    this.active = true;
+
+    if (stageRects.length < STAGE_COUNT) return;
+
+    const spd = 0.008 * speed;
+    this.progress += spd;
+
+    if (this.progress >= 1) {
+      this.progress = 0;
+      this.stageIdx++;
+      if (this.stageIdx >= stageRects.length) {
+        this.reset();
+        this.delay = 10 + Math.random() * 60;
+        return;
+      }
+    }
+
+    const src = stageRects[this.stageIdx];
+    const dst = this.stageIdx < stageRects.length - 1 ? stageRects[this.stageIdx + 1] : src;
+
+    this.x = lerp(src.cx, dst.cx, this.progress);
+    this.y = lerp(src.cy, dst.cy, this.progress);
+
+    this.trail.unshift({ x: this.x, y: this.y });
+    if (this.trail.length > 16) this.trail.pop();
+  }
+
+  draw() {
+    if (!this.active) return;
+    for (let i = 0; i < this.trail.length; i++) {
+      const a = ((1 - i / this.trail.length) * this.alpha * 0.4);
+      const r = this.size * (1 - i / this.trail.length) * 0.7;
+      ctx.beginPath();
+      ctx.arc(this.trail[i].x, this.trail[i].y, r, 0, Math.PI * 2);
+      ctx.fillStyle = hexAlpha(this.color, a);
+      ctx.fill();
+    }
+    const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size * 3);
+    grd.addColorStop(0, hexAlpha(this.color, this.alpha));
+    grd.addColorStop(0.4, hexAlpha(this.color, this.alpha * 0.5));
+    grd.addColorStop(1, hexAlpha(this.color, 0));
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function hexAlpha(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// Build particles
+const particles = Array.from({ length: 22 }, () => new Particle());
+
+// Ambient background particles (stars)
+const stars = Array.from({ length: 80 }, () => ({
+  x: Math.random(), y: Math.random(),
+  r: 0.5 + Math.random() * 1.2,
+  a: 0.1 + Math.random() * 0.4,
+  speed: 0.2 + Math.random() * 0.5,
+  phase: Math.random() * Math.PI * 2
+}));
+
+let frame = 0;
+
+function drawPipelineTube() {
+  if (stageRects.length < 2) return;
+  for (let i = 0; i < stageRects.length - 1; i++) {
+    const a = stageRects[i];
+    const b = stageRects[i + 1];
+    const x1 = a.cx + a.w / 2;
+    const x2 = b.cx - b.w / 2;
+
+    ctx.beginPath();
+    ctx.moveTo(x1, a.cy - 4);
+    ctx.lineTo(x2, b.cy - 4);
+    ctx.lineTo(x2, b.cy + 4);
+    ctx.lineTo(x1, a.cy + 4);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,200,255,0.04)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(x1, a.cy);
+    ctx.lineTo(x2, b.cy);
+    ctx.strokeStyle = `rgba(0,200,255,${0.12 + 0.06 * Math.sin(frame * 0.04 + i)})`;
+    ctx.lineWidth = 7;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x1, a.cy);
+    ctx.lineTo(x2, b.cy);
+    ctx.strokeStyle = `rgba(0,200,255,${0.25 + 0.1 * Math.sin(frame * 0.06 + i)})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+
+function drawStars() {
+  for (const s of stars) {
+    const a = s.a * (0.5 + 0.5 * Math.sin(frame * 0.01 * s.speed + s.phase));
+    ctx.beginPath();
+    ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,200,255,${a})`;
+    ctx.fill();
+  }
+}
+
+function loop() {
+  ctx.clearRect(0, 0, W, H);
+  frame++;
+
+  getStageRects();
+  drawStars();
+  drawPipelineTube();
+
+  if (!paused) {
+    for (const p of particles) {
+      p.update();
+      p.draw();
+    }
+  } else {
+    for (const p of particles) p.draw();
+  }
+
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ═══════════════════════════════════════════════════════════════════
+// REACT LOOP ANIMATION
+// ═══════════════════════════════════════════════════════════════════
+let reactIdx = 0;
+function animateReact() {
+  document.querySelectorAll('.react-step').forEach((el, i) => {
+    el.classList.toggle('lit', i === reactIdx);
+  });
+  reactIdx = (reactIdx + 1) % 3;
+}
+setInterval(animateReact, 900);
+
+// ═══════════════════════════════════════════════════════════════════
+// ACTIVE STAGE HIGHLIGHT (follows particle)
+// ═══════════════════════════════════════════════════════════════════
+function updateActiveStage() {
+  const counts = new Array(STAGE_COUNT).fill(0);
+  for (const p of particles) {
+    if (p.active && p.stageIdx < STAGE_COUNT) counts[p.stageIdx]++;
+  }
+  const maxStage = counts.indexOf(Math.max(...counts));
+  document.querySelectorAll('.stage').forEach((el, i) => {
+    el.classList.toggle('active', i === maxStage);
+  });
+}
+setInterval(updateActiveStage, 200);
+
+// ═══════════════════════════════════════════════════════════════════
+// TICKER
+// ═══════════════════════════════════════════════════════════════════
+const tickerInner = document.getElementById('ticker-inner');
+const allQ = [...QUESTIONS, ...QUESTIONS];
+tickerInner.innerHTML = allQ.map(q =>
+  `<span class="tick-item"><span class="tick-q">${q}</span></span>`
+).join('');
+
+// ═══════════════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════════════
+const modal = document.getElementById('modal');
+let currentModalIdx = -1;
+
+function openModal(idx) {
+  currentModalIdx = idx;
+  const d = MODAL_DATA[idx];
+  document.getElementById('modal-icon').textContent = d.icon;
+  document.getElementById('modal-title').textContent = d.title;
+  document.getElementById('modal-subtitle').textContent = d.subtitle;
+  document.getElementById('modal-body').innerHTML = d.body;
+  modal.classList.add('open');
+  paused = true;
+  updateModalNav();
+}
+
+function closeModal() {
+  modal.classList.remove('open');
+  paused = false;
+  currentModalIdx = -1;
+}
+
+function closeModalOnBg(e) {
+  if (e.target === modal) closeModal();
+}
+
+function nextModal() {
+  if (currentModalIdx < 0) return;
+  const next = (currentModalIdx + 1) % MODAL_DATA.length;
+  openModal(next);
+}
+
+function prevModal() {
+  if (currentModalIdx < 0) return;
+  const prev = (currentModalIdx - 1 + MODAL_DATA.length) % MODAL_DATA.length;
+  openModal(prev);
+}
+
+function updateModalNav() {
+  document.getElementById('modal-counter').textContent = `${currentModalIdx + 1} / ${MODAL_DATA.length}`;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); return; }
+  if (modal.classList.contains('open')) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); nextModal(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); prevModal(); }
+  } else {
+    // not open — arrow keys open from current or first
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { openModal(0); }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('btn-pause').addEventListener('click', () => {
+  paused = !paused;
+  document.getElementById('btn-pause').textContent = paused ? '▶' : '⏸';
+});
+document.getElementById('btn-faster').addEventListener('click', () => {
+  speed = Math.min(3, speed + 0.4);
+});
+document.getElementById('btn-slower').addEventListener('click', () => {
+  speed = Math.max(0.2, speed - 0.3);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// SCALE TO FIT
+// ═══════════════════════════════════════════════════════════════════
+function fitPipeline() {
+  const wrapper = document.getElementById('pipeline-wrapper');
+  if (!wrapper) return;
+  const rect = wrapper.getBoundingClientRect();
+  const sceneW = window.innerWidth - 80;
+  const sceneH = window.innerHeight - 160;
+  const scaleX = sceneW / (rect.width / (wrapper.style.transform ? parseFloat(wrapper.style.transform.match(/scale\(([^)]+)\)/)?.[1] || 1) : 1));
+  const scaleY = sceneH / (rect.height / (wrapper.style.transform ? parseFloat(wrapper.style.transform.match(/scale\(([^)]+)\)/)?.[1] || 1) : 1));
+
+  // simpler: measure unscaled
+  wrapper.style.transform = 'scale(1)';
+  const unscaled = wrapper.getBoundingClientRect();
+  const sx = sceneW / unscaled.width;
+  const sy = sceneH / unscaled.height;
+  const scale = Math.min(sx, sy, 1.0);
+  wrapper.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitPipeline);
+setTimeout(fitPipeline, 100);
+
+</script>
+</body>
+</html>

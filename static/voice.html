@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Maya Voice · Corona</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red: #C8102E;
+      --dark: #0a0a14;
+      --dark2: #12121e;
+      --orb-idle:     #1e3a5f;
+      --orb-listen:   #1a6fa8;
+      --orb-think:    #8b5cf6;
+      --orb-speak:    #10b981;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      color: #aaa;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: rgba(10,10,20,0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #1e1e30;
+      z-index: 100;
+    }
+    .nav-brand {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--red);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 900; font-size: 16px;
+    }
+    .nav-brand h1 { font-size: 15px; font-weight: 700; color: #f0f0f5; }
+    .nav-brand p  { font-size: 11px; color: #666; }
+
+    .nav-tabs { display: flex; gap: 8px; }
+    .nav-tab {
+      padding: 6px 16px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+      text-decoration: none; color: #888;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    .nav-tab:hover { color: #ddd; border-color: #333; }
+    .nav-tab.active { background: var(--red); color: white; border-color: var(--red); }
+
+    /* ── Orb ── */
+    .orb-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .orb {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .orb:hover { transform: scale(1.04); }
+    .orb:active { transform: scale(0.97); }
+
+    .orb-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #2a4a7f, #0a0a14 70%);
+      box-shadow:
+        0 0 60px rgba(30,58,95,0.6),
+        0 0 120px rgba(30,58,95,0.3),
+        inset 0 0 40px rgba(255,255,255,0.05);
+      transition: all 0.4s ease;
+    }
+
+    /* State classes applied to .orb-inner */
+    .orb-inner.listening {
+      background: radial-gradient(circle at 35% 35%, #1a6fa8, #0a0a14 70%);
+      box-shadow:
+        0 0 80px rgba(26,111,168,0.7),
+        0 0 160px rgba(26,111,168,0.3),
+        inset 0 0 40px rgba(255,255,255,0.08);
+      animation: pulse-listen 1.8s ease-in-out infinite;
+    }
+    .orb-inner.thinking {
+      background: radial-gradient(circle at 35% 35%, #7c3aed, #0a0a14 70%);
+      box-shadow:
+        0 0 80px rgba(124,58,237,0.7),
+        0 0 160px rgba(124,58,237,0.3),
+        inset 0 0 40px rgba(255,255,255,0.08);
+      animation: pulse-think 1.2s ease-in-out infinite;
+    }
+    .orb-inner.speaking {
+      background: radial-gradient(circle at 35% 35%, #059669, #0a0a14 70%);
+      box-shadow:
+        0 0 80px rgba(5,150,105,0.7),
+        0 0 160px rgba(5,150,105,0.3),
+        inset 0 0 40px rgba(255,255,255,0.08);
+      animation: pulse-speak 0.8s ease-in-out infinite;
+    }
+    .orb-inner.error {
+      background: radial-gradient(circle at 35% 35%, #be123c, #0a0a14 70%);
+      box-shadow: 0 0 60px rgba(190,18,60,0.5);
+    }
+
+    @keyframes pulse-listen {
+      0%, 100% { transform: scale(1);    opacity: 1;   }
+      50%       { transform: scale(1.06); opacity: 0.9; }
+    }
+    @keyframes pulse-think {
+      0%, 100% { transform: scale(1);    opacity: 0.85; }
+      50%       { transform: scale(1.04); opacity: 1;    }
+    }
+    @keyframes pulse-speak {
+      0%, 100% { transform: scale(1);    box-shadow: 0 0 80px rgba(5,150,105,0.7); }
+      50%       { transform: scale(1.08); box-shadow: 0 0 120px rgba(5,150,105,0.9); }
+    }
+
+    /* ── Labels ── */
+    .state-label {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #555;
+      transition: color 0.3s;
+    }
+    .state-label.listening { color: #1a9fe0; }
+    .state-label.thinking  { color: #a78bfa; }
+    .state-label.speaking  { color: #34d399; }
+    .state-label.error     { color: #f87171; }
+
+    .hint {
+      font-size: 12px;
+      color: #444;
+      text-align: center;
+      max-width: 260px;
+      line-height: 1.5;
+    }
+
+    /* ── Transcript ── */
+    .transcript-box {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(500px, 90vw);
+      background: rgba(18,18,30,0.9);
+      border: 1px solid #2a2a3e;
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 140px;
+      overflow-y: auto;
+      color: #bbb;
+      display: none;
+    }
+    .transcript-box.visible { display: block; }
+    .transcript-box .you  { color: #7dd3fc; }
+    .transcript-box .maya { color: #86efac; }
+
+    /* ── Mic toggle ── */
+    .mic-toggle {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .mic-btn {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--dark2);
+      border: 2px solid #2a2a3e;
+      color: #888;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .mic-btn:hover { border-color: #4a4a6e; color: #bbb; }
+    .mic-btn.active { background: var(--red); border-color: var(--red); color: white; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <div class="logo">C</div>
+    <div>
+      <h1>Corona · Maya Voice</h1>
+      <p>Powered by Realtime API · coral voice</p>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <a href="/" class="nav-tab">💬 Chat</a>
+    <a href="/voice" class="nav-tab active">🎙 Voice</a>
+  </div>
+</nav>
+
+<div class="orb-wrap">
+  <div class="orb" onclick="toggleMic()" title="Click to start/stop">
+    <div class="orb-inner" id="orbInner"></div>
+  </div>
+  <div class="state-label" id="stateLabel">IDLE</div>
+  <p class="hint" id="hint">Click the orb to start talking with Maya</p>
+</div>
+
+<div class="transcript-box" id="transcriptBox"></div>
+
+<div class="mic-toggle">
+  <button class="mic-btn" id="micBtn" onclick="toggleMic()" title="Toggle microphone">🎤</button>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let state = 'idle';  // idle | listening | thinking | speaking | error
+let micActive = false;
+let ws = null;
+let micCtx = null, playCtx = null;
+let nextPlayTime = 0;
+let activeSources = [];
+let micProc = null;
+
+const orbInner   = document.getElementById('orbInner');
+const stateLabel = document.getElementById('stateLabel');
+const hint       = document.getElementById('hint');
+const transcriptBox = document.getElementById('transcriptBox');
+const micBtn     = document.getElementById('micBtn');
+
+function setState(s) {
+  state = s;
+  orbInner.className   = 'orb-inner ' + s;
+  stateLabel.className = 'state-label ' + s;
+  stateLabel.textContent = s.toUpperCase();
+}
+
+function addTranscript(who, text) {
+  if (!text.trim()) return;
+  transcriptBox.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = who;
+  line.textContent = (who === 'you' ? 'You: ' : 'Maya: ') + text;
+  transcriptBox.appendChild(line);
+  transcriptBox.scrollTop = transcriptBox.scrollHeight;
+}
+
+// ── WebSocket bridge ───────────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws/voice`);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => {
+    setState('listening');
+    hint.textContent = 'Speak to Maya — she\'s listening';
+    micBtn.classList.add('active');
+    micBtn.textContent = '🔴';
+  };
+
+  ws.onmessage = async (ev) => {
+    if (ev.data instanceof ArrayBuffer) {
+      // PCM16 audio from OpenAI → play it
+      playPCM16(new Int16Array(ev.data));
+      setState('speaking');
+      return;
+    }
+    // JSON event
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'flush') {
+        flushPlayback();
+        setState('listening');
+      } else if (msg.type === 'input_audio_buffer.speech_started') {
+        setState('listening');
+      } else if (msg.type === 'session.created' || msg.type === 'session.updated') {
+        setState('listening');
+      } else if (msg.type === 'response.done') {
+        setState('listening');
+      } else if (msg.type === 'response.cancelled') {
+        flushPlayback();
+        setState('listening');
+      } else if (msg.type === 'conversation.item.input_audio_transcription.completed') {
+        addTranscript('you', msg.transcript || '');
+        setState('thinking');
+      } else if (msg.type === 'response.audio_transcript.delta') {
+        // Accumulate for final display — handled on response.done below
+      }
+    } catch (e) {}
+  };
+
+  ws.onclose = () => {
+    if (micActive) {
+      setState('idle');
+      hint.textContent = 'Disconnected — click to reconnect';
+      micBtn.classList.remove('active');
+      micBtn.textContent = '🎤';
+      micActive = false;
+      stopMic();
+    }
+  };
+
+  ws.onerror = () => {
+    setState('error');
+    hint.textContent = 'Connection error — is MAYA running?';
+  };
+}
+
+// ── Mic capture ────────────────────────────────────────────────────────────
+async function startMic() {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl:  true,
+        channelCount:     1,
+      }
+    });
+  } catch (err) {
+    setState('error');
+    hint.textContent = 'Mic denied: ' + err.message;
+    return false;
+  }
+
+  micCtx  = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+  playCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+  nextPlayTime = playCtx.currentTime;
+
+  const src  = micCtx.createMediaStreamSource(stream);
+  micProc = micCtx.createScriptProcessor(4096, 1, 1);
+  src.connect(micProc);
+  micProc.connect(micCtx.destination);
+
+  micProc.onaudioprocess = (e) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const f32 = e.inputBuffer.getChannelData(0);
+    // Downsample 48kHz → 24kHz (drop every other sample) + convert to Int16
+    const i16 = new Int16Array(Math.floor(f32.length / 2));
+    for (let i = 0, j = 0; j < i16.length; i += 2, j++) {
+      const s = Math.max(-1, Math.min(1, f32[i]));
+      i16[j] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    ws.send(i16.buffer);
+  };
+
+  return true;
+}
+
+function stopMic() {
+  if (micProc) {
+    try { micProc.disconnect(); } catch(e) {}
+    micProc = null;
+  }
+  if (micCtx) {
+    try { micCtx.close(); } catch(e) {}
+    micCtx = null;
+  }
+}
+
+// ── Audio playback ─────────────────────────────────────────────────────────
+function playPCM16(i16) {
+  if (!playCtx) return;
+  const f32 = new Float32Array(i16.length);
+  for (let i = 0; i < i16.length; i++) {
+    f32[i] = i16[i] / (i16[i] < 0 ? 0x8000 : 0x7FFF);
+  }
+  const buf = playCtx.createBuffer(1, f32.length, 24000);
+  buf.copyToChannel(f32, 0);
+  const src = playCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(playCtx.destination);
+
+  const now = playCtx.currentTime;
+  const t   = Math.max(now, nextPlayTime);
+  src.start(t);
+  nextPlayTime = t + buf.duration;
+  activeSources.push(src);
+  src.onended = () => { activeSources = activeSources.filter(x => x !== src); };
+}
+
+function flushPlayback() {
+  for (const s of activeSources) {
+    try { s.stop(); } catch(e) {}
+  }
+  activeSources = [];
+  if (playCtx) nextPlayTime = playCtx.currentTime;
+}
+
+// ── Toggle ─────────────────────────────────────────────────────────────────
+async function toggleMic() {
+  if (!micActive) {
+    // Start
+    hint.textContent = 'Connecting…';
+    const ok = await startMic();
+    if (!ok) return;
+    connectWS();
+    micActive = true;
+  } else {
+    // Stop
+    micActive = false;
+    if (ws) { try { ws.close(); } catch(e) {} ws = null; }
+    stopMic();
+    flushPlayback();
+    if (playCtx) { try { playCtx.close(); } catch(e) {} playCtx = null; }
+    setState('idle');
+    micBtn.classList.remove('active');
+    micBtn.textContent = '🎤';
+    hint.textContent = 'Click the orb to start talking with Maya';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Corona · Review Intelligence</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red: #C8102E;
+      --dark: #0f0f1a;
+      --dark2: #1a1a2e;
+      --gray: #f4f4f6;
+      --border: #e0e0e8;
+      --text: #1a1a2e;
+      --muted: #6b7280;
+      --bg: #f4f4f6;
+      --bubble-bot: #ffffff;
+      --bubble-user: #C8102E;
+      --input-bg: #ffffff;
+      --input-border: #e0e0e8;
+      --panel-bg: #ffffff;
+    }
+
+    body.dark {
+      --gray: #0f0f1a;
+      --border: #2a2a3e;
+      --text: #f0f0f5;
+      --muted: #9ca3af;
+      --bg: #0f0f1a;
+      --bubble-bot: #1a1a2e;
+      --bubble-user: #a50d24;
+      --input-bg: #1a1a2e;
+      --input-border: #2a2a3e;
+      --panel-bg: #1a1a2e;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      height: 100vh; overflow: hidden;
+      color: var(--text);
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* Header */
+    header {
+      background: var(--dark);
+      color: white; padding: 12px 24px;
+      display: flex; align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 34px; height: 34px; background: var(--red);
+      border-radius: 8px; display: flex; align-items: center;
+      justify-content: center; font-weight: 800; font-size: 15px; color: white;
+    }
+    .header-title h1 { font-size: 15px; font-weight: 700; }
+    .header-title p  { font-size: 11px; color: #6b7280; margin-top: 1px; }
+
+    .header-right { display: flex; gap: 8px; align-items: center; }
+
+    .hbtn {
+      border: none; padding: 7px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .hbtn.red   { background: var(--red); color: white; }
+    .hbtn.red:hover { background: #a50d24; }
+    .hbtn.ghost { background: rgba(255,255,255,0.1); color: white; }
+    .hbtn.ghost:hover { background: rgba(255,255,255,0.2); }
+
+    /* Mode badge */
+    .mode-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 8px;
+      border-radius: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .mode-badge.analyst  { background: #fee2e2; color: #be123c; }
+    .mode-badge.customer { background: #d1fae5; color: #065f46; }
+
+    /* Layout */
+    .main { display: flex; flex: 1; overflow: hidden; }
+    .chat-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    .messages {
+      flex: 1; overflow-y: auto;
+      padding: 24px; display: flex;
+      flex-direction: column; gap: 20px;
+    }
+
+    .message { display: flex; gap: 10px; max-width: 85%; animation: fadeIn 0.2s ease; }
+    .message.user { align-self: flex-end; flex-direction: row-reverse; }
+    .message.bot  { align-self: flex-start; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; font-size: 13px; font-weight: 700;
+    }
+    .message.user .avatar { background: var(--red); color: white; font-size: 12px; }
+    .message.bot  .avatar { background: var(--dark2); color: white; font-size: 15px; }
+
+    .bubble {
+      padding: 12px 16px; border-radius: 16px;
+      font-size: 13.5px; line-height: 1.65;
+    }
+    .message.user .bubble {
+      background: var(--bubble-user); color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .message.bot .bubble {
+      background: var(--bubble-bot); color: var(--text);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+    }
+
+    /* Markdown */
+    .message.bot .bubble h1,
+    .message.bot .bubble h2,
+    .message.bot .bubble h3 { font-size: 14px; font-weight: 700; margin: 10px 0 4px; }
+    .message.bot .bubble p { margin-bottom: 8px; }
+    .message.bot .bubble p:last-child { margin-bottom: 0; }
+    .message.bot .bubble ul, .message.bot .bubble ol { padding-left: 18px; margin-bottom: 8px; }
+    .message.bot .bubble li { margin-bottom: 4px; }
+    .message.bot .bubble strong { font-weight: 700; }
+    .message.bot .bubble hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+    /* Sources */
+    .sources {
+      margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .source-tag {
+      background: var(--gray); border: 1px solid var(--border);
+      border-radius: 8px; padding: 2px 8px; font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* Brief card */
+    .brief-card {
+      margin-top: 12px;
+      background: linear-gradient(135deg, rgba(200,16,46,0.05), rgba(200,16,46,0.02));
+      border: 1px solid rgba(200,16,46,0.2);
+      border-radius: 12px; padding: 14px 16px; font-size: 13px;
+    }
+    .brief-card h4 {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--red); margin-bottom: 10px;
+    }
+    .brief-card p { margin-bottom: 6px; line-height: 1.5; }
+
+    /* Feedback */
+    .feedback-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 6px; padding-left: 40px;
+    }
+    .feedback-label { font-size: 11px; color: var(--muted); }
+    .fb-btn {
+      background: var(--panel-bg); border: 1px solid var(--border);
+      border-radius: 20px; padding: 3px 10px;
+      font-size: 13px; cursor: pointer; transition: all 0.15s;
+    }
+    .fb-btn:hover { border-color: var(--red); }
+    .fb-btn.selected-up   { background: #d1fae5; border-color: #10b981; }
+    .fb-btn.selected-down { background: #fee2e2; border-color: #ef4444; }
+    .trace-link {
+      font-size: 11px; color: var(--muted); text-decoration: none;
+      border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px;
+      transition: all 0.15s;
+    }
+    .trace-link:hover { border-color: #6366f1; color: #6366f1; }
+
+    /* Suggestions */
+    .suggestions {
+      display: flex; flex-wrap: wrap; gap: 7px;
+      margin-top: 8px; padding-left: 40px;
+    }
+    .suggestion-chip {
+      background: var(--panel-bg); border: 1px solid var(--border);
+      border-radius: 20px; padding: 5px 12px;
+      font-size: 12px; color: var(--red);
+      cursor: pointer; transition: all 0.15s; font-weight: 500;
+    }
+    .suggestion-chip:hover { background: var(--red); color: white; border-color: var(--red); }
+
+    /* Typing */
+    .typing {
+      display: flex; align-items: center; gap: 4px;
+      padding: 12px 16px; background: var(--bubble-bot);
+      border-radius: 16px; border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+    }
+    .typing span {
+      width: 7px; height: 7px; background: #9ca3af;
+      border-radius: 50%; animation: bounce 1.2s infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    /* Input */
+    .input-area {
+      padding: 14px 24px; background: var(--input-bg);
+      border-top: 1px solid var(--border);
+      display: flex; gap: 10px; align-items: flex-end; flex-shrink: 0;
+    }
+    textarea {
+      flex: 1; border: 1px solid var(--input-border);
+      border-radius: 12px; padding: 10px 14px;
+      font-size: 13.5px; font-family: inherit;
+      resize: none; outline: none; max-height: 120px;
+      line-height: 1.5; transition: border-color 0.2s;
+      background: var(--input-bg); color: var(--text);
+    }
+    textarea:focus { border-color: var(--red); }
+    .send-btn {
+      background: var(--red); color: white; border: none;
+      width: 40px; height: 40px; border-radius: 12px;
+      cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s; flex-shrink: 0;
+    }
+    .send-btn:hover    { background: #a50d24; }
+    .send-btn:disabled { background: #d1d5db; cursor: not-allowed; }
+
+    /* Radar panel */
+    .radar-panel {
+      width: 340px; background: var(--panel-bg);
+      border-left: 1px solid var(--border);
+      display: none; flex-direction: column; overflow: hidden;
+    }
+    .radar-panel.open { display: flex; }
+
+    .radar-header {
+      padding: 14px 18px; background: var(--dark);
+      color: white; display: flex; align-items: center; justify-content: space-between;
+    }
+    .radar-header h2 { font-size: 14px; font-weight: 700; }
+    .radar-header p  { font-size: 11px; color: #6b7280; margin-top: 2px; }
+    .close-radar { background: none; border: none; color: white; font-size: 18px; cursor: pointer; }
+
+    .radar-content { flex: 1; overflow-y: auto; padding: 18px; }
+    .radar-loading { text-align: center; color: var(--muted); padding: 40px 0; font-size: 13px; }
+
+    .radar-stat {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 14px; border-radius: 10px; margin-bottom: 10px;
+      font-size: 13px; font-weight: 500;
+    }
+    .radar-stat.defect  { background: #fff1f2; border: 1px solid #fecdd3; color: #be123c; }
+    .radar-stat.service { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .radar-stat .count  { font-size: 22px; font-weight: 800; }
+
+    .radar-section-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted); margin: 14px 0 8px;
+    }
+
+    .top-product-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px; background: #fff1f2;
+      border-radius: 8px; margin-bottom: 6px; font-size: 12px;
+    }
+    .top-product-row .badge {
+      background: var(--red); color: white;
+      border-radius: 12px; padding: 2px 8px;
+      font-size: 11px; font-weight: 700;
+    }
+
+    .defect-card {
+      background: var(--gray); border-radius: 8px;
+      padding: 10px 12px; margin-bottom: 8px; font-size: 12px; line-height: 1.5;
+    }
+    .defect-card .product-name { font-weight: 700; color: var(--red); margin-bottom: 4px; }
+    .defect-card .snippet { color: var(--muted);
+      display: -webkit-box; -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+
+    /* Chart card */
+    .chart-card {
+      margin-top: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      width: 420px;
+      max-width: 420px;
+    }
+    .chart-card h4 {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted); margin-bottom: 12px;
+    }
+    .chart-card canvas { width: 100% !important; height: 200px !important; }
+
+    /* Surprise card */
+    .surprise-card {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border: 1px solid #fcd34d; border-radius: 12px;
+      padding: 14px 16px; font-size: 13px; line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .surprise-card h4 { font-size: 11px; font-weight: 700; color: #92400e; margin-bottom: 6px; text-transform: uppercase; }
+
+    /* Store card */
+    .store-card {
+      margin-top: 12px; display: flex; gap: 10px;
+    }
+    .store-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      gap: 6px; padding: 14px 10px; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--panel-bg);
+      text-decoration: none; color: var(--text);
+      transition: all 0.15s; font-size: 12px; font-weight: 600;
+      cursor: pointer;
+    }
+    .store-btn:hover { border-color: var(--red); background: #fff1f2; color: var(--red); }
+    .store-btn .store-icon { font-size: 22px; }
+    .store-btn .store-name { font-size: 11px; font-weight: 700; }
+    .store-btn .store-sub { font-size: 10px; color: var(--muted); font-weight: 400; }
+
+    /* Unlock modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--panel-bg); border-radius: 16px;
+      padding: 28px 28px 24px; width: 320px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .modal-box p  { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+    .modal-input {
+      width: 100%; border: 1px solid var(--input-border);
+      border-radius: 10px; padding: 10px 12px;
+      font-size: 13px; font-family: inherit;
+      background: var(--input-bg); color: var(--text);
+      outline: none; margin-bottom: 14px;
+    }
+    .modal-input:focus { border-color: var(--red); }
+    .modal-error { font-size: 12px; color: #ef4444; margin-bottom: 10px; display: none; }
+    .modal-btns { display: flex; gap: 8px; }
+    .modal-btn {
+      flex: 1; padding: 9px; border-radius: 10px;
+      font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+    }
+    .modal-btn.primary { background: var(--red); color: white; }
+    .modal-btn.primary:hover { background: #a50d24; }
+    .modal-btn.secondary { background: var(--gray); color: var(--text); border: 1px solid var(--border); }
+
+    /* Welcome */
+    .welcome { text-align: center; padding: 40px 24px; color: var(--muted); }
+    .welcome h2 { font-size: 20px; color: var(--text); margin-bottom: 8px; }
+    .welcome p  { font-size: 13px; margin-bottom: 20px; }
+    .starter-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .starter-chip {
+      background: var(--panel-bg); border: 1px solid var(--border);
+      border-radius: 20px; padding: 8px 14px;
+      font-size: 12px; color: var(--red);
+      cursor: pointer; transition: all 0.15s; font-weight: 500;
+    }
+    .starter-chip:hover { background: var(--red); color: white; border-color: var(--red); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo">C</div>
+    <div class="header-title">
+      <h1>Corona Review Intelligence</h1>
+      <p>Powered by RAG · GPT-4o-mini · LangSmith</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <a href="/voice" class="hbtn ghost" style="text-decoration:none;">🎙 Voice</a>
+    <button class="hbtn ghost" onclick="clearChat()">🗑 Clear</button>
+    <button class="hbtn ghost" onclick="toggleDark()">🌙</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="chat-container">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <h2>👋 Hey, I'm Maya</h2>
+        <p>I work for both Corona's product team <strong>and</strong> customers. Ask me anything — I'll adapt to you.</p>
+        <div class="starter-chips">
+          <div class="starter-chip" onclick="sendStarter(this)">Which toilet is best for small bathrooms?</div>
+          <div class="starter-chip" onclick="sendStarter(this)">How do I install the Sanitario Nyren?</div>
+          <div class="starter-chip" onclick="sendStarter(this)">What's the most water-efficient model?</div>
+          <div class="starter-chip" onclick="sendStarter(this)">Compare HomeCenter vs Corona store</div>
+          <div class="starter-chip" onclick="sendStarter(this)">Does the toilet come with the seat included?</div>
+          <div class="starter-chip" onclick="sendStarter(this)">How do I clean and maintain my toilet?</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sprint 7: image preview bar (hidden until images selected) -->
+    <div id="imagePreviewBar" style="display:none; padding:8px 24px 0; background:var(--input-bg); flex-wrap:wrap; gap:8px; align-items:center;">
+      <div id="imageThumbs" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+      <button onclick="cancelImageUpload()" style="background:#cc1a30;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;">✕ Clear</button>
+      <span style="font-size:12px; color:var(--muted);">Hit ➤ to send</span>
+    </div>
+    <div class="input-area">
+      <!-- Sprint 7: image upload button (multiple) -->
+      <label for="imageUpload" title="Upload toilet photos for seat cover recommendations"
+             style="cursor:pointer; font-size:20px; padding:0 6px 0 2px; user-select:none; opacity:0.7;"
+             onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.7'">📷</label>
+      <input type="file" id="imageUpload" accept="image/*" multiple style="display:none" onchange="stagImageUpload(event)">
+      <textarea id="input" placeholder="Ask Maya anything about Corona toilets..."
+        rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <!-- Sprint 7: voice input button -->
+      <button id="micBtn" onclick="toggleRecording()" title="Click to record voice"
+              style="background:none;border:none;font-size:20px;cursor:pointer;padding:0 4px;opacity:0.7;transition:all 0.2s;"
+              onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.7'">🎤</button>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  marked.setOptions({ breaks: true, gfm: true });
+  let isDark = false;
+
+  const CHART_PALETTE = [
+    'rgba(200,16,46,0.82)','rgba(59,130,246,0.82)','rgba(16,185,129,0.82)',
+    'rgba(245,158,11,0.82)','rgba(139,92,246,0.82)','rgba(20,184,166,0.82)','rgba(236,72,153,0.82)',
+  ];
+  const CHART_BORDERS = ['#C8102E','#3B82F6','#10B981','#F59E0B','#8B5CF6','#14B8A6','#EC4899'];
+
+  function renderChart(canvasId, chartType, chartData) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    const base = { responsive:true, maintainAspectRatio:false };
+    if (chartType === 'bar') {
+      new Chart(ctx, { type:'bar', data:{ labels:chartData.labels, datasets:[{ data:chartData.datasets[0].data, backgroundColor:CHART_PALETTE[0], borderColor:CHART_BORDERS[0], borderWidth:1, borderRadius:6 }] }, options:{ ...base, indexAxis:'y', plugins:{ legend:{ display:false } }, scales:{ x:{ beginAtZero:true, ticks:{ stepSize:1, color:'#6b7280' } }, y:{ ticks:{ color:'#6b7280', font:{ size:11 } } } } } });
+    } else if (chartType === 'doughnut') {
+      new Chart(ctx, { type:'doughnut', data:{ labels:chartData.labels, datasets:[{ data:chartData.datasets[0].data, backgroundColor:CHART_PALETTE, borderWidth:2 }] }, options:{ ...base, cutout:'65%', plugins:{ legend:{ position:'right', labels:{ font:{ size:11 }, color:'#6b7280' } } } } });
+    } else if (chartType === 'radar') {
+      new Chart(ctx, { type:'radar', data:{ labels:chartData.labels, datasets:chartData.datasets.map((ds,i)=>({ label:ds.label, data:ds.data, backgroundColor:CHART_PALETTE[i].replace('0.82','0.15'), borderColor:CHART_BORDERS[i], borderWidth:2, pointBackgroundColor:CHART_BORDERS[i], pointRadius:3 })) }, options:{ ...base, scales:{ r:{ beginAtZero:true, max:10, ticks:{ stepSize:2, color:'#6b7280', backdropColor:'transparent' }, grid:{ color:'rgba(0,0,0,0.08)' }, pointLabels:{ font:{ size:11 }, color:'#374151' } } }, plugins:{ legend:{ position:'top', labels:{ font:{ size:11 }, color:'#6b7280' } } } } });
+    } else if (chartType === 'bubble') {
+      new Chart(ctx, { type:'bubble', data:{ datasets:chartData.labels.map((label,i)=>({ label:label, data:[chartData.datasets[0].data[i]], backgroundColor:CHART_PALETTE[i%CHART_PALETTE.length], borderColor:CHART_BORDERS[i%CHART_BORDERS.length], borderWidth:1 })) }, options:{ ...base, scales:{ x:{ beginAtZero:true, title:{ display:true, text:'Defect Reports', color:'#6b7280' }, ticks:{ color:'#6b7280' } }, y:{ beginAtZero:true, title:{ display:true, text:'Service Issues', color:'#6b7280' }, ticks:{ color:'#6b7280' } } }, plugins:{ legend:{ position:'right', labels:{ font:{ size:10 }, color:'#6b7280' } } } } });
+    } else if (chartType === 'polarArea') {
+      new Chart(ctx, { type:'polarArea', data:{ labels:chartData.labels, datasets:[{ data:chartData.datasets[0].data, backgroundColor:CHART_PALETTE, borderWidth:1 }] }, options:{ ...base, plugins:{ legend:{ position:'right', labels:{ font:{ size:11 }, color:'#6b7280' } } }, scales:{ r:{ ticks:{ color:'#6b7280', backdropColor:'transparent' } } } } });
+    } else if (chartType === 'stackedBar') {
+      new Chart(ctx, { type:'bar', data:{ labels:chartData.labels, datasets:chartData.datasets.map((ds,i)=>({ label:ds.label, data:ds.data, backgroundColor:CHART_PALETTE[i], borderWidth:0, borderRadius: i===chartData.datasets.length-1 ? { topLeft:6, topRight:6 } : 0 })) }, options:{ ...base, scales:{ x:{ stacked:true, ticks:{ color:'#6b7280', font:{ size:10 } } }, y:{ stacked:true, beginAtZero:true, ticks:{ color:'#6b7280' } } }, plugins:{ legend:{ position:'top', labels:{ font:{ size:11 }, color:'#6b7280' } } } } });
+    }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  // Sprint 7 — staged multi-image upload
+  let _stagedFiles = [];
+
+  function stagImageUpload(event) {
+    const newFiles = Array.from(event.target.files);
+    if (!newFiles.length) return;
+    _stagedFiles = _stagedFiles.concat(newFiles);
+
+    const thumbsEl = document.getElementById('imageThumbs');
+    newFiles.forEach(f => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;display:inline-block;';
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      img.style.cssText = 'height:56px;border-radius:6px;border:2px solid var(--red);';
+      wrap.appendChild(img);
+      thumbsEl.appendChild(wrap);
+    });
+
+    const bar = document.getElementById('imagePreviewBar');
+    bar.style.display = 'flex';
+    document.getElementById('input').placeholder = 'Add a caption or just hit ➤ to send…';
+    // reset input so same file can be re-selected
+    event.target.value = '';
+  }
+
+  function cancelImageUpload() {
+    _stagedFiles = [];
+    document.getElementById('imageUpload').value = '';
+    const bar = document.getElementById('imagePreviewBar');
+    bar.style.display = 'none';
+    document.getElementById('imageThumbs').innerHTML = '';
+    document.getElementById('input').placeholder = 'Ask Maya anything about Corona toilets...';
+  }
+
+  async function sendStagedImage(caption) {
+    const files = [..._stagedFiles];
+    cancelImageUpload();
+
+    // Show user image bubble(s)
+    const messages = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'message user';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    if (caption) bubble.appendChild(document.createTextNode(caption));
+    const imgGrid = document.createElement('div');
+    imgGrid.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;';
+    files.forEach(f => {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      img.style.cssText = 'max-width:160px;max-height:160px;border-radius:8px;';
+      imgGrid.appendChild(img);
+    });
+    bubble.appendChild(imgGrid);
+    const av = document.createElement('div');
+    av.className = 'avatar'; av.textContent = 'U';
+    div.appendChild(av); div.appendChild(bubble);
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+
+    // Upload all files in one request
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    if (caption) formData.append('caption', caption);
+    formData.append('session_id', 'default');
+
+    const typingId = appendTyping();
+    try {
+      const resp = await fetch('/upload-image', { method: 'POST', body: formData });
+      removeTyping(typingId);
+      const data = await resp.json();
+      const answer = data.error ? `⚠️ ${data.error}` : (data.answer || 'No result returned.');
+      appendBotMessage(answer, data.run_id || null, data.suggestions || [], false, data.trace_url || null);
+    } catch (err) {
+      removeTyping(typingId);
+      appendBotMessage(`⚠️ Upload failed: ${err.message}`, null, null, null, null, null, false, null, null);
+    }
+  }
+
+  // ── Sprint 7: Whisper voice input ──────────────────────────────────────────
+  let _recording = false;
+  let _mediaRecorder = null;
+  let _audioChunks = [];
+
+  async function toggleRecording() {
+    if (_recording) {
+      stopRecording();
+    } else {
+      await startRecording();
+    }
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+      _mediaRecorder = new MediaRecorder(stream, { mimeType });
+      _audioChunks = [];
+      _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _audioChunks.push(e.data); };
+      _mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        await sendAudioToWhisper(new Blob(_audioChunks, { type: mimeType }), mimeType);
+      };
+      _mediaRecorder.start();
+      _recording = true;
+      const btn = document.getElementById('micBtn');
+      btn.textContent = '🔴';
+      btn.style.opacity = '1';
+      btn.title = 'Click to stop recording';
+      document.getElementById('input').placeholder = 'Recording… click 🔴 to stop';
+    } catch (err) {
+      appendBotMessage(`⚠️ Mic access denied: ${err.message}`, null, null, null, null, null, false, null, null);
+    }
+  }
+
+  function stopRecording() {
+    if (_mediaRecorder && _recording) {
+      _mediaRecorder.stop();
+      _recording = false;
+      const btn = document.getElementById('micBtn');
+      btn.textContent = '🎤';
+      btn.title = 'Hold to speak';
+      document.getElementById('input').placeholder = 'Transcribing…';
+    }
+  }
+
+  async function sendAudioToWhisper(blob, mimeType) {
+    const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
+    const formData = new FormData();
+    formData.append('file', blob, `recording.${ext}`);
+    try {
+      const resp = await fetch('/transcribe', { method: 'POST', body: formData });
+      const data = await resp.json();
+      const input = document.getElementById('input');
+      if (data.transcript) {
+        input.value = data.transcript;
+        input.placeholder = 'Ask Maya anything about Corona toilets...';
+        autoResize(input);
+        input.focus();
+      } else {
+        input.placeholder = 'Ask Maya anything about Corona toilets...';
+        appendBotMessage(`⚠️ Transcription failed: ${data.error || 'unknown error'}`, null, null, null, null, null, false, null, null);
+      }
+    } catch (err) {
+      document.getElementById('input').placeholder = 'Ask Maya anything about Corona toilets...';
+      appendBotMessage(`⚠️ Transcription error: ${err.message}`, null, null, null, null, null, false, null, null);
+    }
+  }
+  // ── end voice input ─────────────────────────────────────────────────────────
+
+  function sendStarter(el) {
+    document.getElementById('input').value = el.textContent;
+    sendMessage();
+  }
+
+  function toggleDark() {
+    isDark = !isDark;
+    document.body.classList.toggle('dark', isDark);
+  }
+
+  async function clearChat() {
+    document.getElementById('messages').innerHTML = '';
+    await fetch('/clear', { method: 'POST' });
+  }
+
+
+  async function sendMessage(text) {
+    const input = document.getElementById('input');
+    const question = text || input.value.trim();
+
+    // Sprint 7 — if images staged, send them (with optional caption)
+    if (_stagedFiles.length > 0) {
+      const caption = question || '';
+      input.value = '';
+      input.style.height = 'auto';
+      await sendStagedImage(caption);
+      return;
+    }
+
+    if (!question) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    document.getElementById('sendBtn').disabled = true;
+
+    const welcome = document.getElementById('welcome');
+    if (welcome) welcome.remove();
+
+    appendUserMessage(question);
+    const typingId = appendTyping();
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+      });
+      const data = await res.json();
+      removeTyping(typingId);
+
+      if (data.error) {
+        appendBotMessage('❌ ' + data.error, null, [], false, null);
+      } else {
+        appendBotMessage(data.answer, data.run_id, data.suggestions, data.show_stores, data.trace_url);
+      }
+    } catch (err) {
+      removeTyping(typingId);
+      appendBotMessage('❌ Connection error. Is the server running?', null, [], false, null);
+    }
+
+    document.getElementById('sendBtn').disabled = false;
+    document.getElementById('input').focus();
+  }
+
+  function appendUserMessage(text) {
+    const messages = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'message user';
+    div.innerHTML = `<div class="avatar">U</div><div class="bubble">${escapeHtml(text)}</div>`;
+    messages.appendChild(div);
+    scrollToBottom();
+  }
+
+  function appendBotMessage(text, runId, suggestions, showStores, traceUrl) {
+    const messages = document.getElementById('messages');
+
+    // Store card — for store-related questions
+    let storeHtml = '';
+    if (showStores) {
+      storeHtml = `
+        <div class="store-card">
+          <a class="store-btn" href="https://www.corona.com.co" target="_blank">
+            <span class="store-icon">🏪</span>
+            <span class="store-name">Corona Store</span>
+            <span class="store-sub">Tienda oficial</span>
+          </a>
+          <a class="store-btn" href="https://www.homecenter.com.co/homecenter-co/colombianos_de_corazon/corona" target="_blank">
+            <span class="store-icon">🏬</span>
+            <span class="store-name">HomeCenter</span>
+            <span class="store-sub">Sección Corona</span>
+          </a>
+        </div>`;
+    }
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message bot';
+    msgDiv.innerHTML = `
+      <div class="avatar">🏠</div>
+      <div class="bubble">${marked.parse(text || '')}${storeHtml}</div>
+    `;
+    messages.appendChild(msgDiv);
+
+    // Feedback + LangSmith trace link
+    if (runId) {
+      const fbRow = document.createElement('div');
+      fbRow.className = 'feedback-row';
+      const traceBtn = traceUrl
+        ? `<a class="trace-link" href="${traceUrl}" target="_blank" title="View LangSmith trace">🔍 Trace</a>`
+        : '';
+      fbRow.innerHTML = `
+        <span class="feedback-label">Helpful?</span>
+        <button class="fb-btn" id="up-${runId}" onclick="sendFeedback('${runId}', 1)">👍</button>
+        <button class="fb-btn" id="down-${runId}" onclick="sendFeedback('${runId}', 0)">👎</button>
+        ${traceBtn}
+      `;
+      messages.appendChild(fbRow);
+    }
+
+    // Suggestions
+    if (suggestions && suggestions.length > 0) {
+      const sugDiv = document.createElement('div');
+      sugDiv.className = 'suggestions';
+      suggestions.forEach(s => {
+        const chip = document.createElement('div');
+        chip.className = 'suggestion-chip';
+        chip.textContent = s;
+        chip.onclick = () => sendMessage(s);
+        sugDiv.appendChild(chip);
+      });
+      messages.appendChild(sugDiv);
+    }
+
+    scrollToBottom();
+  }
+
+  async function sendFeedback(runId, score) {
+    document.getElementById(`up-${runId}`).classList.remove('selected-up');
+    document.getElementById(`down-${runId}`).classList.remove('selected-down');
+    if (score === 1) document.getElementById(`up-${runId}`).classList.add('selected-up');
+    else document.getElementById(`down-${runId}`).classList.add('selected-down');
+
+    await fetch('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ run_id: runId, score }),
+    });
+  }
+
+  function appendTyping() {
+    const messages = document.getElementById('messages');
+    const id = 'typing-' + Date.now();
+    const div = document.createElement('div');
+    div.className = 'message bot'; div.id = id;
+    div.innerHTML = `<div class="avatar">🏠</div><div class="typing"><span></span><span></span><span></span></div>`;
+    messages.appendChild(div);
+    scrollToBottom();
+    return id;
+  }
+
+  function removeTyping(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  function scrollToBottom() {
+    const m = document.getElementById('messages');
+    m.scrollTop = m.scrollHeight;
+  }
+
+  function escapeHtml(text) {
+    return (text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAYA Sprint 6 · Corona Review Intelligence</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #080812;
+    --bg2: #0d0d22;
+    --blue: #00c8ff;
+    --cyan: #00ffe7;
+    --purple: #7b3fff;
+    --pink: #ff3fa4;
+    --green: #00ff88;
+    --yellow: #ffe600;
+    --red: #ff3b3b;
+    --card-bg: rgba(0, 200, 255, 0.04);
+    --card-border: rgba(0, 200, 255, 0.18);
+    --glow: rgba(0, 200, 255, 0.35);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: #e0f4ff;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── HEADER ── */
+  #header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+    background: rgba(8,8,18,0.85);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(0,200,255,0.12);
+  }
+  #header .logo {
+    font-size: 13px; font-weight: 700; letter-spacing: 3px;
+    color: var(--blue); text-transform: uppercase;
+  }
+  #header .logo span { color: var(--cyan); }
+  #header .badge {
+    font-size: 11px; letter-spacing: 2px;
+    background: rgba(0,200,255,0.1);
+    border: 1px solid rgba(0,200,255,0.3);
+    border-radius: 20px; padding: 4px 14px;
+    color: var(--cyan);
+  }
+  #header .status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: rgba(255,255,255,0.45);
+  }
+  .pulse-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulseGreen 1.6s ease-in-out infinite;
+  }
+  @keyframes pulseGreen { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(0.7)} }
+
+  /* ── CANVAS LAYER ── */
+  #pipelineCanvas {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ── MAIN SCENE ── */
+  #scene {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2;
+    overflow: hidden;
+  }
+
+  #pipeline-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 40px;
+    transform-origin: center center;
+    transition: transform 0.4s cubic-bezier(0.23,1,0.32,1);
+  }
+
+  /* ── CONNECTOR TUBE ── */
+  .connector {
+    width: 38px; height: 6px;
+    background: linear-gradient(90deg, rgba(0,200,255,0.15), rgba(0,200,255,0.4), rgba(0,200,255,0.15));
+    position: relative;
+    flex-shrink: 0;
+    border-radius: 3px;
+    overflow: visible;
+  }
+  .connector::after {
+    content: '';
+    position: absolute; top: 50%; left: 0; right: 0;
+    height: 2px; margin-top: -1px;
+    background: linear-gradient(90deg, transparent, var(--blue), transparent);
+    animation: flowPulse 2s linear infinite;
+  }
+  @keyframes flowPulse {
+    0%   { opacity: 0.2; transform: scaleX(0.3) translateX(-100%); }
+    100% { opacity: 0; transform: scaleX(0.3) translateX(400%); }
+  }
+
+  /* ── FORK CONNECTOR ── */
+  .fork-connector {
+    width: 22px; height: 6px;
+    background: linear-gradient(90deg, rgba(0,200,255,0.15), rgba(0,200,255,0.3));
+    flex-shrink: 0; border-radius: 3px;
+  }
+
+  /* ── STAGE CARD ── */
+  .stage {
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 18px 16px 16px;
+    width: 118px;
+    min-height: 148px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.25s cubic-bezier(0.23,1,0.32,1),
+                box-shadow 0.25s ease,
+                border-color 0.25s ease,
+                background 0.25s ease;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(8px);
+  }
+  .stage::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 16px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0,200,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .stage:hover {
+    transform: translateY(-5px) scale(1.035);
+    border-color: rgba(0,200,255,0.55);
+    box-shadow: 0 0 28px rgba(0,200,255,0.22), 0 8px 32px rgba(0,0,0,0.4);
+    background: rgba(0,200,255,0.07);
+  }
+  .stage.active {
+    border-color: var(--cyan);
+    box-shadow: 0 0 40px rgba(0,255,231,0.35), 0 0 80px rgba(0,255,231,0.1);
+    background: rgba(0,255,231,0.06);
+  }
+  .stage.blocked {
+    border-color: var(--red);
+    box-shadow: 0 0 30px rgba(255,59,59,0.4);
+    animation: blockFlash 0.4s ease;
+  }
+  @keyframes blockFlash {
+    0%,100% { background: rgba(0,200,255,0.04); }
+    50%      { background: rgba(255,59,59,0.18); }
+  }
+
+  .stage-num {
+    position: absolute; top: 8px; left: 12px;
+    font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+    color: rgba(0,200,255,0.4);
+  }
+  .stage-icon {
+    font-size: 28px; line-height: 1;
+    filter: drop-shadow(0 0 8px currentColor);
+    margin-top: 4px;
+  }
+  .stage-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.8px;
+    text-transform: uppercase; text-align: center;
+    color: var(--blue);
+    line-height: 1.3;
+  }
+  .stage-sub {
+    font-size: 9.5px; color: rgba(255,255,255,0.45);
+    text-align: center; line-height: 1.4;
+  }
+  .stage-tag {
+    font-size: 8.5px; letter-spacing: 0.8px;
+    background: rgba(0,200,255,0.1);
+    border: 1px solid rgba(0,200,255,0.25);
+    border-radius: 8px; padding: 2px 7px;
+    color: var(--cyan);
+    margin-top: auto;
+  }
+
+  /* ── TOOLS FORK STAGE ── */
+  .tools-stage {
+    width: 148px;
+    min-height: 200px;
+  }
+  .tools-branches {
+    display: flex; flex-direction: column; gap: 4px;
+    width: 100%; margin-top: 4px;
+  }
+  .tool-branch {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 8.5px; color: rgba(255,255,255,0.5);
+    padding: 3px 6px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .tool-branch.lit {
+    color: var(--cyan);
+    border-color: rgba(0,255,231,0.35);
+    background: rgba(0,255,231,0.05);
+    box-shadow: 0 0 10px rgba(0,255,231,0.15);
+  }
+  .tool-branch span.emoji { font-size: 11px; }
+
+  /* ── REACT AGENT LOOP ── */
+  .react-loop {
+    display: flex; flex-direction: column; gap: 3px; width: 100%; margin-top: 2px;
+  }
+  .react-step {
+    font-size: 8px; padding: 2px 6px; border-radius: 5px;
+    background: rgba(123,63,255,0.08);
+    border: 1px solid rgba(123,63,255,0.2);
+    color: rgba(255,255,255,0.45);
+    transition: all 0.3s;
+    text-align: center;
+  }
+  .react-step.lit {
+    color: #c4a4ff;
+    border-color: rgba(123,63,255,0.6);
+    background: rgba(123,63,255,0.18);
+    box-shadow: 0 0 8px rgba(123,63,255,0.3);
+  }
+
+  /* ── TYPING CURSOR STAGE ── */
+  .question-display {
+    font-size: 8.5px; color: rgba(255,255,255,0.5);
+    text-align: center; min-height: 26px; line-height: 1.4;
+    margin-top: 2px;
+  }
+  .cursor { display: inline-block; width: 1px; height: 10px;
+    background: var(--cyan); margin-left: 1px; vertical-align: middle;
+    animation: blink 1.1s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── RESPONSE STAGE ── */
+  .response-stage {
+    background: rgba(0,255,231,0.04);
+    border-color: rgba(0,255,231,0.25);
+  }
+  .response-stage .stage-title { color: var(--cyan); }
+  .response-glow {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,255,231,0.5) 0%, transparent 70%);
+    animation: responseGlow 2s ease-in-out infinite;
+    margin-top: 2px;
+  }
+  @keyframes responseGlow {
+    0%,100% { transform: scale(0.9); opacity: 0.7; }
+    50%      { transform: scale(1.15); opacity: 1; }
+  }
+
+  /* ── DETAIL MODAL ── */
+  #modal {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(8,8,18,0.88);
+    backdrop-filter: blur(20px);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  #modal.open { opacity: 1; pointer-events: all; }
+  #modal-card {
+    background: linear-gradient(145deg, rgba(0,200,255,0.07), rgba(0,0,0,0.3));
+    border: 1px solid rgba(0,200,255,0.35);
+    border-radius: 24px;
+    padding: 40px 44px;
+    max-width: 560px; width: 90%;
+    transform: scale(0.88) translateY(16px);
+    transition: transform 0.35s cubic-bezier(0.23,1,0.32,1);
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,200,255,0.15), 0 24px 80px rgba(0,0,0,0.6);
+  }
+  #modal.open #modal-card { transform: scale(1) translateY(0); }
+  #modal-close {
+    position: absolute; top: 16px; right: 20px;
+    font-size: 20px; color: rgba(255,255,255,0.3);
+    cursor: pointer; transition: color 0.2s;
+    background: none; border: none;
+    line-height: 1;
+  }
+  #modal-close:hover { color: var(--blue); }
+  #modal-icon { font-size: 48px; margin-bottom: 12px; display: block; }
+  #modal-title {
+    font-size: 22px; font-weight: 700; letter-spacing: 2px;
+    color: var(--blue); text-transform: uppercase; margin-bottom: 6px;
+  }
+  #modal-subtitle {
+    font-size: 13px; color: rgba(255,255,255,0.45);
+    margin-bottom: 20px; letter-spacing: 0.5px;
+  }
+  #modal-body { font-size: 13px; line-height: 1.75; color: rgba(255,255,255,0.7); }
+  #modal-body strong { color: var(--cyan); }
+  #modal-body .tag {
+    display: inline-block;
+    background: rgba(0,200,255,0.1);
+    border: 1px solid rgba(0,200,255,0.25);
+    border-radius: 10px; padding: 3px 10px;
+    font-size: 11px; color: var(--cyan);
+    margin: 3px 2px;
+  }
+  #modal-body .tag.purple { background: rgba(123,63,255,0.1); border-color: rgba(123,63,255,0.3); color: #c4a4ff; }
+  #modal-body .tag.green { background: rgba(0,255,136,0.08); border-color: rgba(0,255,136,0.25); color: var(--green); }
+  #modal-body .tag.red { background: rgba(255,59,59,0.1); border-color: rgba(255,59,59,0.3); color: var(--red); }
+  #modal-body code {
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px; color: #a8d8ea;
+    background: rgba(0,200,255,0.07);
+    padding: 1px 6px; border-radius: 4px;
+  }
+  .modal-stat-row {
+    display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap;
+  }
+  .modal-stat {
+    flex: 1; min-width: 110px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(0,200,255,0.12);
+    border-radius: 12px; padding: 12px 14px; text-align: center;
+  }
+  .modal-stat .val { font-size: 22px; font-weight: 700; color: var(--cyan); }
+  .modal-stat .lbl { font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 1px; margin-top: 2px; }
+
+  /* ── TICKER ── */
+  #ticker {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(8,8,18,0.9);
+    border-top: 1px solid rgba(0,200,255,0.1);
+    padding: 9px 20px;
+    display: flex; align-items: center; gap: 14px;
+    font-size: 11.5px; overflow: hidden;
+  }
+  #ticker .label {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    color: var(--blue); background: rgba(0,200,255,0.1);
+    border: 1px solid rgba(0,200,255,0.25);
+    border-radius: 4px; padding: 2px 8px; white-space: nowrap;
+  }
+  #ticker-inner {
+    display: flex; gap: 0; white-space: nowrap;
+    animation: tickerScroll 35s linear infinite;
+  }
+  @keyframes tickerScroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .tick-item {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: rgba(255,255,255,0.45); padding: 0 30px;
+  }
+  .tick-item::before {
+    content: '◆'; font-size: 7px; color: var(--blue); opacity: 0.5;
+  }
+  .tick-q { color: rgba(0,200,255,0.7); }
+
+  /* ── LEGEND ── */
+  #legend {
+    position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
+    z-index: 50; display: flex; flex-direction: column; gap: 10px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 9.5px; color: rgba(255,255,255,0.3);
+  }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── GRID LINES ── */
+  #grid-overlay {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* ── SCAN LINE ── */
+  #scanline {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.04) 2px,
+      rgba(0,0,0,0.04) 4px
+    );
+  }
+
+  /* ── STAGE GLOW RING ── */
+  .stage::after {
+    content: '';
+    position: absolute; inset: -1px;
+    border-radius: 17px;
+    opacity: 0;
+    border: 1px solid var(--cyan);
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .stage.active::after { opacity: 1; animation: ringPulse 2s ease-in-out infinite; }
+  @keyframes ringPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,255,231,0.3); }
+    50%      { box-shadow: 0 0 0 6px rgba(0,255,231,0); }
+  }
+
+  /* ── SHIELD PARTICLES ── */
+  .shield-particles {
+    position: absolute; inset: 0; overflow: hidden;
+    pointer-events: none; border-radius: 16px;
+  }
+  .shield-bit {
+    position: absolute; width: 3px; height: 3px; border-radius: 50%;
+    background: var(--red);
+    animation: shieldBlock 1.5s ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes shieldBlock {
+    0% { transform: translateX(20px) translateY(var(--dy)); opacity: 0; }
+    30% { opacity: 0.8; }
+    60% { opacity: 0; transform: translateX(-10px) translateY(var(--dy)); }
+    100% { opacity: 0; }
+  }
+
+  /* ── SLIDE SYSTEM ── */
+  #slide-overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(8,8,18,0.97);
+    transition: background 0.5s ease;
+    pointer-events: auto;
+  }
+  #slide-overlay.pipeline-active {
+    background: transparent;
+    pointer-events: none;
+  }
+  .s-slide {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column; justify-content: center; align-items: center;
+    padding: 80px 60px 64px;
+    pointer-events: auto;
+  }
+  .s-slide.active { display: flex; }
+  .s-content { width: 100%; max-width: 1100px; }
+  .s-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 3.5px;
+    text-transform: uppercase; color: rgba(0,200,255,0.45); margin-bottom: 10px;
+  }
+  .s-h1 { font-size: clamp(2.4rem,5vw,4.2rem); font-weight:900; line-height:1.05; }
+  .s-h2 { font-size: clamp(1.7rem,3.2vw,2.6rem); font-weight:800; line-height:1.15; margin-bottom:20px; }
+  .s-card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 16px; padding: 20px 22px; backdrop-filter: blur(8px);
+  }
+  .s-card.red  { border-color:rgba(255,59,59,0.3);  background:rgba(255,59,59,0.03);  }
+  .s-card.green{ border-color:rgba(0,255,136,0.28); background:rgba(0,255,136,0.03);  }
+  .s-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .s-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .s-stat { background:rgba(0,0,0,0.3); border:1px solid rgba(0,200,255,0.12); border-radius:14px; padding:16px; text-align:center; }
+  .s-stat .val { font-size:1.9rem; font-weight:800; color:var(--cyan); }
+  .s-stat .lbl { font-size:9px; letter-spacing:2px; color:rgba(255,255,255,0.28); margin-top:4px; text-transform:uppercase; }
+  .s-tag { display:inline-block; background:rgba(0,200,255,0.07); border:1px solid rgba(0,200,255,0.2); border-radius:8px; padding:2px 9px; font-size:10.5px; color:var(--cyan); margin:2px; }
+  .s-tag.green  { background:rgba(0,255,136,0.06);  border-color:rgba(0,255,136,0.2);  color:var(--green); }
+  .s-tag.purple { background:rgba(123,63,255,0.07); border-color:rgba(123,63,255,0.22);color:#c4a4ff; }
+  .s-tag.red    { background:rgba(255,59,59,0.06);  border-color:rgba(255,59,59,0.22); color:var(--red); }
+  .s-sm { font-size:12.5px; color:rgba(255,255,255,0.48); line-height:1.65; }
+  .s-md { font-size:14px;   color:rgba(255,255,255,0.6);  line-height:1.65; }
+  .s-check { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid rgba(0,200,255,0.06); font-size:13px; }
+  .s-check-icon { color:var(--green); font-size:14px; flex-shrink:0; margin-top:2px; }
+  .s-code { background:rgba(0,0,0,0.45); border:1px solid rgba(0,200,255,0.1); border-radius:11px; padding:14px 16px; font-family:'Courier New',monospace; font-size:11px; line-height:1.85; color:rgba(255,255,255,0.58); }
+  .s-code .kw { color:var(--cyan); } .s-code .str { color:#ffb86c; } .s-code .cm { color:rgba(255,255,255,0.26); }
+  .s-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:7px 11px; border-radius:8px; margin-bottom:5px; }
+  .s-tool-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:10px; margin-bottom:5px; background:rgba(0,200,255,0.03); border:1px solid rgba(0,200,255,0.1); font-size:12.5px; }
+  .s-react-step { display:flex; align-items:flex-start; gap:11px; padding:12px 14px; border-radius:11px; margin-bottom:8px; border:1px solid rgba(0,200,255,0.12); background:rgba(0,200,255,0.04); font-size:12.5px; }
+  .s-demo-q { display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:11px; margin-bottom:8px; background:rgba(0,200,255,0.03); border:1px solid rgba(0,200,255,0.12); font-size:13px; color:rgba(255,255,255,0.7); }
+  .s-demo-num { color:var(--blue); font-size:9.5px; font-weight:700; letter-spacing:2px; width:20px; flex-shrink:0; }
+  .mt2 { margin-top:14px; } .mt3 { margin-top:22px; }
+
+  /* Nav arrows */
+  .s-nav-btn {
+    position:fixed; top:50%; transform:translateY(-50%); z-index:90;
+    width:42px; height:42px; background:rgba(0,200,255,0.07);
+    border:1px solid rgba(0,200,255,0.2); border-radius:50%;
+    color:var(--blue); font-size:22px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:all 0.2s; user-select:none;
+  }
+  .s-nav-btn:hover { background:rgba(0,200,255,0.15); border-color:var(--blue); box-shadow:0 0 20px rgba(0,200,255,0.2); }
+  #s-nav-prev { left:14px; }
+  #s-nav-next { right:14px; }
+
+  /* Slide dots */
+  #s-dots {
+    position:fixed; bottom:58px; left:50%; transform:translateX(-50%);
+    z-index:90; display:flex; gap:8px; align-items:center;
+  }
+  .s-dot { width:6px; height:6px; border-radius:50%; background:rgba(0,200,255,0.2); cursor:pointer; transition:all 0.3s; }
+  .s-dot.active { background:var(--blue); transform:scale(1.4); }
+
+  /* Pipeline hint on slide 5 */
+  #pipeline-hint {
+    position:fixed; bottom:60px; left:50%; transform:translateX(-50%);
+    z-index:90; font-size:10px; letter-spacing:2px; color:rgba(0,200,255,0.35);
+    display:none;
+  }
+
+  /* speed control */
+  #controls {
+    position: fixed; left: 20px; top: 50%; transform: translateY(-50%);
+    z-index: 50; display: flex; flex-direction: column; gap: 10px;
+  }
+  .ctrl-btn {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(0,200,255,0.07);
+    border: 1px solid rgba(0,200,255,0.2);
+    color: var(--blue); font-size: 15px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .ctrl-btn:hover { background: rgba(0,200,255,0.15); border-color: var(--blue); }
+</style>
+</head>
+<body>
+
+<div id="grid-overlay"></div>
+<div id="scanline"></div>
+<canvas id="pipelineCanvas"></canvas>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="logo" style="display:flex;align-items:center;gap:10px">
+    <svg width="22" height="18" viewBox="0 0 44 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 32 L4 14 L14 22 L22 4 L30 22 L40 14 L40 32 Z" stroke="#00c8ff" stroke-width="2" stroke-linejoin="round" fill="rgba(0,200,255,0.12)"/>
+      <line x1="2" y1="32" x2="42" y2="32" stroke="#00c8ff" stroke-width="2"/>
+    </svg>
+    <span style="color:rgba(255,255,255,0.55);letter-spacing:3px">CORONA</span>
+    <span style="color:rgba(0,200,255,0.3)">·</span>
+    <a href="http://localhost:8000" target="_blank" style="color:var(--blue);text-decoration:none;letter-spacing:3px" onmouseover="this.style.color='var(--cyan)'" onmouseout="this.style.color='var(--blue)'">MAYA</a>
+  </div>
+  <div class="badge">SPRINT 6</div>
+  <div class="status" id="slide-counter-header">
+    <div class="pulse-dot"></div>
+    <span id="hdr-slide-num">01 / 10</span>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div id="controls">
+  <button class="ctrl-btn" id="btn-slower" title="Slower">⏵</button>
+  <button class="ctrl-btn" id="btn-pause" title="Pause/Play">⏸</button>
+  <button class="ctrl-btn" id="btn-faster" title="Faster">⏩</button>
+</div>
+
+<!-- LEGEND -->
+<div id="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Particle</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Blocked</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Answer</div>
+</div>
+
+<!-- PIPELINE -->
+<div id="scene">
+  <div id="pipeline-wrapper">
+
+    <!-- 1. USER INPUT -->
+    <div class="stage" id="stage-0" onclick="openModal(0)">
+      <div class="stage-num">01</div>
+      <div class="stage-icon">⌨️</div>
+      <div class="stage-title">User<br>Input</div>
+      <div class="question-display" id="typing-display"><span class="cursor"></span></div>
+      <div class="stage-tag">Corona · ES</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 2. INJECTION GUARD -->
+    <div class="stage" id="stage-1" onclick="openModal(1)">
+      <div class="stage-num">02</div>
+      <div class="shield-particles">
+        <div class="shield-bit" style="--dy:-8px; top:40%; animation-delay:0.0s"></div>
+        <div class="shield-bit" style="--dy:5px;  top:55%; animation-delay:0.6s"></div>
+        <div class="shield-bit" style="--dy:-3px; top:65%; animation-delay:1.1s"></div>
+      </div>
+      <div class="stage-icon">🛡️</div>
+      <div class="stage-title">Injection<br>Guard</div>
+      <div class="stage-sub">8 regex<br>patterns</div>
+      <div class="stage-tag">SAFE ✓</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 3. REACT AGENT -->
+    <div class="stage" id="stage-2" onclick="openModal(2)">
+      <div class="stage-num">03</div>
+      <div class="stage-icon">🧠</div>
+      <div class="stage-title">ReAct<br>Agent</div>
+      <div class="react-loop">
+        <div class="react-step" id="react-0">💭 Thought</div>
+        <div class="react-step" id="react-1">⚡ Action</div>
+        <div class="react-step" id="react-2">👁 Observe</div>
+      </div>
+      <div class="stage-tag">LangGraph</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 4. TOOLS FORK -->
+    <div class="stage tools-stage" id="stage-3" onclick="openModal(3)">
+      <div class="stage-num">04</div>
+      <div class="stage-icon">🔧</div>
+      <div class="stage-title">Tools</div>
+      <div class="tools-branches">
+        <div class="tool-branch" id="tool-0"><span class="emoji">🌤</span>Weather</div>
+        <div class="tool-branch" id="tool-1"><span class="emoji">🔍</span>Search</div>
+        <div class="tool-branch" id="tool-2"><span class="emoji">💬</span>SQL Query</div>
+        <div class="tool-branch" id="tool-3"><span class="emoji">📊</span>Table</div>
+        <div class="tool-branch" id="tool-4"><span class="emoji">💻</span>Code</div>
+      </div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 5. CHROMADB -->
+    <div class="stage" id="stage-4" onclick="openModal(4)">
+      <div class="stage-num">05</div>
+      <div class="stage-icon">🗄️</div>
+      <div class="stage-title">ChromaDB</div>
+      <div class="stage-sub">Vector<br>Search</div>
+      <div class="stage-tag">1,100+ chunks</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 6. GPT-4o-mini -->
+    <div class="stage" id="stage-5" onclick="openModal(5)">
+      <div class="stage-num">06</div>
+      <div class="stage-icon">✦</div>
+      <div class="stage-title">GPT-4o<br>mini</div>
+      <div class="stage-sub">Generates<br>response</div>
+      <div class="stage-tag">OpenAI</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 7. LANGSMITH -->
+    <div class="stage" id="stage-6" onclick="openModal(6)">
+      <div class="stage-num">07</div>
+      <div class="stage-icon">👁</div>
+      <div class="stage-title">LangSmith</div>
+      <div class="stage-sub">Every step<br>traced</div>
+      <div class="stage-tag">Observability</div>
+    </div>
+
+    <div class="connector"></div>
+
+    <!-- 8. RESPONSE -->
+    <div class="stage response-stage" id="stage-7" onclick="openModal(7)">
+      <div class="stage-num">08</div>
+      <div class="response-glow"></div>
+      <div class="stage-title">Response</div>
+      <div class="stage-sub">Grounded<br>answer</div>
+      <div class="stage-tag">✓ Delivered</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TICKER -->
+<div id="ticker">
+  <div class="label">DEMO QUESTIONS</div>
+  <div id="ticker-inner"></div>
+</div>
+
+<!-- SLIDE OVERLAY -->
+<div id="slide-overlay">
+
+  <!-- S1: TITLE -->
+  <div class="s-slide active" id="s1">
+    <div class="s-content" style="text-align:center">
+      <div class="s-label" style="margin-bottom:18px">Data Science Bootcamp · Sprint 6</div>
+      <div class="s-h1" style="margin-bottom:16px">
+        <span style="color:var(--blue)">Corona</span> Review<br>
+        Intelligence <span style="background:linear-gradient(90deg,var(--blue),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent">MAYA</span>
+      </div>
+      <p class="s-md" style="margin-bottom:32px;max-width:520px;margin-left:auto;margin-right:auto">Agent-Powered AI Chatbot · 221 Real Customer Reviews · 49 Toilet Products</p>
+      <div class="s-card" style="max-width:580px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:24px;text-align:left">
+        <div>
+          <div class="s-label" style="margin-bottom:12px">Presented By</div>
+          <div style="display:flex;flex-direction:column;gap:9px;font-size:14px;color:rgba(255,255,255,0.65)">
+            <div>Bhavya Pandya</div><div>Abhishek Raval</div>
+            <div>Tirth Bharodiya</div><div>Gurleen Sabharwal</div>
+          </div>
+        </div>
+        <div>
+          <div class="s-label" style="margin-bottom:12px">Under Guidance Of</div>
+          <div style="display:flex;flex-direction:column;gap:9px;font-size:14px;color:rgba(255,255,255,0.65)">
+            <div>Juan Jaramillo</div><div>Juan Felipe Mansalvo</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S2: THE PROBLEM -->
+  <div class="s-slide" id="s2">
+    <div class="s-content">
+      <div class="s-label">Why We Had To Fix Everything First</div>
+      <div class="s-h2">Sprint 5 gave <span style="color:var(--red)">generic answers</span></div>
+      <div class="s-grid-2">
+        <div class="s-card red">
+          <div class="s-label" style="color:rgba(255,59,59,0.55)">The Failure</div>
+          <p class="s-md" style="margin:10px 0 12px">Ask MAYA: <em style="color:rgba(255,255,255,0.8)">"How do I install the Nyren?"</em></p>
+          <div style="background:rgba(255,59,59,0.07);border:1px solid rgba(255,59,59,0.2);border-radius:10px;padding:13px;font-size:12.5px;color:rgba(255,255,255,0.55);font-style:italic">"Please refer to the installation instructions that come with your product."</div>
+          <div class="mt2"><span class="s-tag red">Root Cause 1</span><p class="s-sm" style="margin-top:6px">Nyren PDFs are image scans. PyMuPDF extracted 0 text. ChromaDB had empty chunks.</p></div>
+          <div class="mt2"><span class="s-tag red">Root Cause 2</span><p class="s-sm" style="margin-top:6px">vectorstore.get() returns chunks in random order. Chunk 0 was the cover page, not steps.</p></div>
+        </div>
+        <div class="s-card green">
+          <div class="s-label" style="color:rgba(0,255,136,0.55)">The Fix</div>
+          <p class="s-md" style="margin:10px 0 12px">Same question after Sprint 6:</p>
+          <div style="background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.2);border-radius:10px;padding:13px;font-size:12.5px;color:rgba(255,255,255,0.65)">"Step 1: Shut off the water supply valve. Step 2: Remove the tank lid..."<span style="color:var(--green);display:block;margin-top:6px">↑ Real steps from the 32-page installation manual</span></div>
+          <div class="mt2"><span class="s-tag green">Fix 1 — Vision OCR</span><p class="s-sm" style="margin-top:6px">GPT-4o-mini converts every PDF page to PNG, extracts all text. 5 chunks → 162.</p></div>
+          <div class="mt2"><span class="s-tag green">Fix 2 — Source Filter</span><p class="s-sm" style="margin-top:6px">PRODUCT_SOURCE_MAP + similarity_search with filter ranks by relevance, not random order.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S3: WHAT WE BUILT -->
+  <div class="s-slide" id="s3">
+    <div class="s-content">
+      <div class="s-label">Sprint 6 Deliverables</div>
+      <div class="s-h2">Everything we <span style="color:var(--cyan)">shipped</span></div>
+      <div class="s-grid-2">
+        <div>
+          <div class="s-check"><span class="s-check-icon">✓</span><div><strong>LangGraph ReAct Agent</strong><span class="s-sm" style="display:block;margin-top:3px">create_react_agent replaces old RAG chain — Thought → Action → Observation loop</span></div></div>
+          <div class="s-check"><span class="s-check-icon">✓</span><div><strong>5 Agent Tools</strong><span class="s-sm" style="display:block;margin-top:3px">Weather, web search, DB query, table generator, code execution — all @tool decorated</span></div></div>
+          <div class="s-check"><span class="s-check-icon">✓</span><div><strong>GPT-4o-mini Vision OCR</strong><span class="s-sm" style="display:block;margin-top:3px">All 3 image-based PDFs re-ingested — 162 Nyren chunks from 32 pages (was 5)</span></div></div>
+          <div class="s-check"><span class="s-check-icon">✓</span><div><strong>PRODUCT_SOURCE_MAP</strong><span class="s-sm" style="display:block;margin-top:3px">Targeted retrieval — similarity_search with source filter fixes random chunk ordering</span></div></div>
+        </div>
+        <div>
+          <div class="s-check"><span class="s-check-icon">✓</span><div><strong>LangSmith Tracing Fixed</strong><span class="s-sm" style="display:block;margin-top:3px">Env vars set before LangChain imports — every tool call, token, and latency traced</span></div></div>
+          <div class="s-check"><span class="s-check-icon">✓</span><div><strong>Graphify Knowledge Graph</strong><span class="s-sm" style="display:block;margin-top:3px">186 nodes, 236 edges, 23 communities — architectural insights from full codebase</span></div></div>
+          <div class="s-check"><span class="s-check-icon">✓</span><div><strong>MCP Server</strong><span class="s-sm" style="display:block;margin-top:3px">6 tools via Model Context Protocol — any AI client can connect via fastmcp</span></div></div>
+          <div class="s-check"><span class="s-check-icon">✓</span><div><strong>Prompt Injection Protection</strong><span class="s-sm" style="display:block;margin-top:3px">8 regex patterns block jailbreaks before the LLM is ever called</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S4: DATA & INGESTION -->
+  <div class="s-slide" id="s4">
+    <div class="s-content">
+      <div class="s-label">Data & Ingestion</div>
+      <div class="s-h2">From <span style="color:var(--red)">0 text</span> to <span style="color:var(--green)">1,100+ chunks</span></div>
+      <div class="s-grid-4" style="margin-bottom:16px">
+        <div class="s-stat"><div class="val">221</div><div class="lbl">Reviews</div></div>
+        <div class="s-stat"><div class="val">49</div><div class="lbl">Products</div></div>
+        <div class="s-stat"><div class="val">1,100+</div><div class="lbl">Chunks</div></div>
+        <div class="s-stat"><div class="val">32</div><div class="lbl">OCR Pages</div></div>
+      </div>
+      <div class="s-grid-2">
+        <div class="s-card red">
+          <div class="s-label" style="color:rgba(255,59,59,0.55)">Before — Sprint 5</div>
+          <div class="mt2">
+            <div class="s-row" style="background:rgba(255,59,59,0.05);border:1px solid rgba(255,59,59,0.14)"><span class="s-sm">Nyren Install Guide (32 pages)</span><span style="color:var(--red);font-size:12px">~5 chunks</span></div>
+            <div class="s-row" style="background:rgba(255,59,59,0.05);border:1px solid rgba(255,59,59,0.14)"><span class="s-sm">Nyren Ficha Técnica</span><span style="color:var(--red);font-size:12px">0 chunks</span></div>
+            <div class="s-row" style="background:rgba(255,59,59,0.05);border:1px solid rgba(255,59,59,0.14)"><span class="s-sm">Aluvia Plus RD Spec Sheet</span><span style="color:var(--red);font-size:12px">5 chunks</span></div>
+          </div>
+          <p class="s-sm mt2">Image-based scans — PyMuPDF extracted almost nothing. ChromaDB had empty chunks.</p>
+        </div>
+        <div class="s-card green">
+          <div class="s-label" style="color:rgba(0,255,136,0.55)">After — Vision OCR</div>
+          <div class="mt2">
+            <div class="s-row" style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.14)"><span class="s-sm">Nyren Install Guide</span><span style="color:var(--green);font-size:12px">162 chunks ↑</span></div>
+            <div class="s-row" style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.14)"><span class="s-sm">Nyren Ficha Técnica</span><span style="color:var(--green);font-size:12px">7 chunks ↑</span></div>
+            <div class="s-row" style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.14)"><span class="s-sm">Aluvia Plus RD</span><span style="color:var(--green);font-size:12px">17 chunks ↑</span></div>
+          </div>
+          <p class="s-sm mt2">Every page → PNG → GPT-4o-mini extracts all text, specs, steps, warnings.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S5: PIPELINE (transparent — pipeline shows through) -->
+  <div class="s-slide" id="s5" style="pointer-events:none"></div>
+
+  <!-- S6: ACCURACY FIX -->
+  <div class="s-slide" id="s6">
+    <div class="s-content">
+      <div class="s-label">The Core Fix</div>
+      <div class="s-h2">PRODUCT_SOURCE_MAP — <span style="color:var(--green)">targeted retrieval</span></div>
+      <div class="s-grid-2">
+        <div>
+          <p class="s-md" style="margin-bottom:14px">When a question mentions a product + technical keyword, skip generic search. Go straight to that product's source document:</p>
+          <div class="s-code">
+<span class="cm"># Map: product keyword → source files</span>
+<span class="kw">PRODUCT_SOURCE_MAP</span> = {
+  <span class="str">"nyren"</span>:   [<span class="str">"nyren-instalacion.pdf"</span>,
+               <span class="str">"nyren-ficha-tecnica.pdf"</span>],
+  <span class="str">"aluvia"</span>:  [<span class="str">"Sanitario_Aluvia_Plus.docx"</span>],
+  <span class="str">"cascade"</span>: [<span class="str">"Sanitario_Cascade.docx"</span>],
+  <span class="str">"cima"</span>:    [<span class="str">"Sanitario_Cima.docx"</span>],
+}
+<span class="cm"># similarity_search WITH source filter</span>
+ranked = vs.<span class="kw">similarity_search</span>(
+  question, k=<span class="str">20</span>,
+  filter={<span class="str">"source"</span>: src}  <span class="cm"># ranked by relevance</span>
+)
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="s-card red">
+            <div class="s-label" style="color:rgba(255,59,59,0.5)">Why .get() was wrong</div>
+            <p class="s-sm mt2">Returns chunks in random insertion order. Chunk 0 = cover page. LLM had no real content — returned a generic placeholder every time.</p>
+          </div>
+          <div class="s-card green">
+            <div class="s-label" style="color:rgba(0,255,136,0.5)">Why filter works</div>
+            <p class="s-sm mt2">similarity_search ranks by cosine distance to the question. Installation steps rank #1 for "how do I install". Cover page never appears.</p>
+          </div>
+          <div class="s-card">
+            <div class="s-label">Verified working</div>
+            <div style="margin-top:8px"><span class="s-tag green">Nyren install steps</span><span class="s-tag green">Aluvia maintenance</span><span class="s-tag green">Cascade specs</span><span class="s-tag green">Cima dimensions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S7: REACT AGENT -->
+  <div class="s-slide" id="s7">
+    <div class="s-content">
+      <div class="s-label">Agent Architecture</div>
+      <div class="s-h2">LangGraph <span style="color:#c4a4ff">ReAct</span> Agent</div>
+      <div class="s-grid-2">
+        <div>
+          <div class="s-react-step"><span style="font-size:22px;flex-shrink:0">💭</span><div><div style="font-weight:700;color:#c4a4ff;font-size:13px;margin-bottom:4px">THOUGHT</div><p class="s-sm">Agent reasons about what it needs — which tool to call, what info is missing, whether it can answer</p></div></div>
+          <div class="s-react-step"><span style="font-size:22px;flex-shrink:0">⚡</span><div><div style="font-weight:700;color:var(--blue);font-size:13px;margin-bottom:4px">ACTION</div><p class="s-sm">Dispatches a tool call with structured parameters — one tool per loop iteration</p></div></div>
+          <div class="s-react-step"><span style="font-size:22px;flex-shrink:0">👁</span><div><div style="font-weight:700;color:var(--green);font-size:13px;margin-bottom:4px">OBSERVATION</div><p class="s-sm">Reads tool result — loop continues or terminates with final grounded answer</p></div></div>
+          <div class="s-code mt2" style="font-size:10.5px"><span class="cm"># langgraph.prebuilt — not langchain.agents</span>
+agent = <span class="kw">create_react_agent</span>(llm, TOOLS)</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;color:rgba(0,200,255,0.4);margin-bottom:10px">5 TOOLS</div>
+          <div class="s-tool-row"><span style="font-size:17px">🌤</span><div><strong style="font-size:13px">get_weather</strong><span class="s-sm" style="display:block">wttr.in — live weather, no API key</span></div></div>
+          <div class="s-tool-row"><span style="font-size:17px">🔍</span><div><strong style="font-size:13px">web_search</strong><span class="s-sm" style="display:block">DuckDuckGo via ddgs — SP500, current events</span></div></div>
+          <div class="s-tool-row"><span style="font-size:17px">🗄️</span><div><strong style="font-size:13px">query_products</strong><span class="s-sm" style="display:block">ChromaDB similarity search — 1,100+ chunks</span></div></div>
+          <div class="s-tool-row"><span style="font-size:17px">📊</span><div><strong style="font-size:13px">generate_product_table</strong><span class="s-sm" style="display:block">HTML table — water use, ADA, dimensions</span></div></div>
+          <div class="s-tool-row"><span style="font-size:17px">💻</span><div><strong style="font-size:13px">execute_code</strong><span class="s-sm" style="display:block">Safe Python sandbox — calculations, stats</span></div></div>
+          <div class="mt2"><span class="s-tag purple">LangSmith traces every step</span><span class="s-tag purple">strip_markdown() on output</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S8: GRAPHIFY -->
+  <div class="s-slide" id="s8">
+    <div class="s-content">
+      <div class="s-label">Codebase Intelligence</div>
+      <div class="s-h2">Graphify <span style="color:var(--blue)">Knowledge Graph</span></div>
+      <div class="s-grid-2">
+        <div>
+          <div class="s-grid-2" style="margin-bottom:14px;gap:10px">
+            <div class="s-stat"><div class="val">186</div><div class="lbl">Nodes</div></div>
+            <div class="s-stat"><div class="val">236</div><div class="lbl">Edges</div></div>
+            <div class="s-stat"><div class="val">23</div><div class="lbl">Communities</div></div>
+            <div class="s-stat"><div class="val">17</div><div class="lbl">Files Mapped</div></div>
+          </div>
+          <div class="s-card">
+            <div class="s-label">Highest Connected Nodes</div>
+            <div style="margin-top:10px">
+              <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:8px 0;border-bottom:1px solid rgba(0,200,255,0.07)"><span style="color:var(--blue)">ask()</span><span class="s-sm">14 edges — central hub</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:8px 0;border-bottom:1px solid rgba(0,200,255,0.07)"><span style="color:var(--blue)">Sanitario Aluvia Plus</span><span class="s-sm">10 edges</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:8px 0"><span style="color:var(--blue)">run_liability_radar()</span><span class="s-sm">9 edges</span></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="s-card green">
+            <div class="s-label" style="color:rgba(0,255,136,0.5)">Key Architectural Insight</div>
+            <p class="s-sm mt2">run_liability_radar() and query_products() both hit the same <strong style="color:var(--cyan)">_vectorstore global</strong> — exact same ChromaDB engine underneath.</p>
+            <p class="s-sm mt2">The radar IS the DB query tool with a defect vs. service classification pass on top.</p>
+          </div>
+          <div class="s-card">
+            <div class="s-label">What It's For</div>
+            <p class="s-sm mt2">Built over full codebase — 17 files, ~15k words. Used during development to understand architecture. Not MAYA's runtime retrieval.</p>
+            <div style="margin-top:10px"><span class="s-tag">graphify-out/graph.html</span><span class="s-tag">Interactive browser view</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S9: MCP -->
+  <div class="s-slide" id="s9">
+    <div class="s-content">
+      <div class="s-label">Model Context Protocol</div>
+      <div class="s-h2">MCP Server — <span style="color:#c4a4ff">tools any AI can use</span></div>
+      <div class="s-grid-2">
+        <div>
+          <div class="s-grid-2" style="margin-bottom:14px;gap:12px">
+            <div class="s-card red" style="padding:16px"><div class="s-label" style="color:rgba(255,59,59,0.5)">Without MCP</div><p class="s-sm mt2">Tools hardcoded inside MAYA. Only MAYA can use them.</p></div>
+            <div class="s-card green" style="padding:16px"><div class="s-label" style="color:rgba(0,255,136,0.5)">With MCP</div><p class="s-sm mt2">Tools on a separate server. Any AI client can connect and call them.</p></div>
+          </div>
+          <div class="s-code" style="font-size:10.5px">
+<span class="cm"># Run the MCP server</span>
+python mcp_server.py
+<span class="cm"># Connects via stdio transport</span>
+<span class="cm"># Claude Desktop config already written</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;color:rgba(0,200,255,0.4);margin-bottom:10px">6 TOOLS EXPOSED</div>
+          <div class="s-tool-row"><span style="font-size:17px">🌤</span><div><strong>get_weather</strong></div></div>
+          <div class="s-tool-row"><span style="font-size:17px">🔍</span><div><strong>web_search</strong></div></div>
+          <div class="s-tool-row"><span style="font-size:17px">🗄️</span><div><strong>query_corona_products</strong></div></div>
+          <div class="s-tool-row"><span style="font-size:17px">📊</span><div><strong>generate_product_table</strong></div></div>
+          <div class="s-tool-row"><span style="font-size:17px">💬</span><div><strong>get_product_sentiment</strong></div></div>
+          <div class="s-tool-row"><span style="font-size:17px">💻</span><div><strong>execute_code</strong></div></div>
+          <div class="mt2"><span class="s-tag purple">fastmcp</span><span class="s-tag purple">stdio transport</span><span class="s-tag purple">Claude Desktop ready</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S10: DEMO -->
+  <div class="s-slide" id="s10">
+    <div class="s-content" style="display:flex;flex-direction:column;align-items:center">
+      <div class="s-label">Live Demo</div>
+      <div class="s-h2" style="text-align:center">What we're about to <span style="color:var(--cyan)">show you</span></div>
+      <p class="s-md" style="margin-bottom:26px;text-align:center">Customer mode only · localhost:8000 · real answers from actual product docs</p>
+      <div style="width:100%;max-width:660px">
+        <div class="s-demo-q"><span class="s-demo-num">01</span>"How is the weather today in Bogotá?"<span class="s-tag" style="margin-left:auto;flex-shrink:0">Weather tool</span></div>
+        <div class="s-demo-q"><span class="s-demo-num">02</span>"What is the current price of the S&amp;P500?"<span class="s-tag" style="margin-left:auto;flex-shrink:0">Web search</span></div>
+        <div class="s-demo-q"><span class="s-demo-num">03</span>"How do I install the Sanitario Nyren?"<span class="s-tag green" style="margin-left:auto;flex-shrink:0">Vision OCR fix</span></div>
+        <div class="s-demo-q"><span class="s-demo-num">04</span>"What are the technical specs of the Nyren?"<span class="s-tag green" style="margin-left:auto;flex-shrink:0">Source filter</span></div>
+        <div class="s-demo-q"><span class="s-demo-num">05</span>"Maintenance instructions for the Aluvia Plus?"<span class="s-tag green" style="margin-left:auto;flex-shrink:0">PRODUCT_MAP</span></div>
+      </div>
+      <div class="s-grid-2 mt3" style="max-width:660px;width:100%;gap:12px">
+        <div class="s-card" style="padding:16px"><div class="s-label">Stack</div><div style="margin-top:8px"><span class="s-tag">FastAPI</span><span class="s-tag">LangGraph</span><span class="s-tag">ChromaDB</span><span class="s-tag">GPT-4o-mini</span><span class="s-tag">LangSmith</span></div></div>
+        <div class="s-card" style="padding:16px"><div class="s-label">Data</div><div style="margin-top:8px"><span class="s-tag green">221 reviews</span><span class="s-tag green">49 products</span><span class="s-tag green">1,100+ chunks</span></div></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end slide-overlay -->
+
+<!-- NAV ARROWS -->
+<button class="s-nav-btn" id="s-nav-prev" onclick="sChangeSlide(-1)">‹</button>
+<button class="s-nav-btn" id="s-nav-next" onclick="sChangeSlide(1)">›</button>
+<div id="s-dots"></div>
+<div id="pipeline-hint">CLICK ANY STAGE FOR DETAILS · ESC TO CLOSE</div>
+
+<!-- MODAL -->
+<div id="modal" onclick="closeModalOnBg(event)">
+  <div id="modal-card">
+    <button id="modal-close" onclick="closeModal()">✕</button>
+    <span id="modal-icon"></span>
+    <div id="modal-title"></div>
+    <div id="modal-subtitle"></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════════
+const QUESTIONS = [
+  "How is the weather today in Bogotá?",
+  "What is the current price of the S&P500?",
+  "How do I install the Sanitario Nyren?",
+  "What are the technical specifications of the Nyren?",
+  "What are the maintenance instructions for the Aluvia Plus?",
+  "Where can I buy Corona toilets?",
+  "Which toilets have water consumption less than 3.8 LPF?",
+  "What's the best toilet for a small bathroom?",
+];
+
+const MODAL_DATA = [
+  {
+    icon: "⌨️",
+    title: "User Input",
+    subtitle: "Entry point — customer questions about Corona toilet products",
+    body: `
+      <p>Every interaction begins here. Customers ask in <strong>English</strong> about Corona's toilet catalog — installation, specs, maintenance, water consumption, where to buy.</p>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">EN</div><div class="lbl">Language</div></div>
+        <div class="modal-stat"><div class="val">~40</div><div class="lbl">Avg tokens</div></div>
+        <div class="modal-stat"><div class="val">&lt;10ms</div><div class="lbl">Capture latency</div></div>
+      </div>
+      <p style="margin-top:16px">Input is passed to the injection guard before anything else. If clean, it routes to the LangGraph ReAct agent which decides which tool to call.</p>
+      <div style="margin-top:12px">
+        <span class="tag">REST POST /chat</span>
+        <span class="tag">FastAPI</span>
+        <span class="tag">session_id memory</span>
+      </div>
+    `
+  },
+  {
+    icon: "🛡️",
+    title: "Injection Guard",
+    subtitle: "Security layer — blocks prompt injection attempts before reaching the LLM",
+    body: `
+      <p>The guard runs <strong>8 compiled regex patterns</strong> against the raw user input to catch prompt injection and jailbreak attempts before they reach the ReAct agent.</p>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">8</div><div class="lbl">Patterns</div></div>
+        <div class="modal-stat"><div class="val">&lt;1ms</div><div class="lbl">Check time</div></div>
+        <div class="modal-stat"><div class="val">400</div><div class="lbl">On block</div></div>
+      </div>
+      <p style="margin-top:16px">Patterns detected:</p>
+      <div style="margin-top:8px">
+        <span class="tag red">Ignore previous</span>
+        <span class="tag red">System prompt</span>
+        <span class="tag red">DAN / jailbreak</span>
+        <span class="tag red">Role override</span>
+        <span class="tag red">Instruction leak</span>
+        <span class="tag red">Base64 inject</span>
+        <span class="tag red">CRLF inject</span>
+        <span class="tag red">Context escape</span>
+      </div>
+      <p style="margin-top:14px">Blocked requests return <code>HTTP 400</code> with a safe error message and are logged to LangSmith for audit.</p>
+    `
+  },
+  {
+    icon: "🧠",
+    title: "ReAct Agent",
+    subtitle: "Reasoning engine — Thought → Action → Observation loop via LangGraph",
+    body: `
+      <p>The core of MAYA is a <strong>ReAct (Reason + Act)</strong> agent implemented with LangChain. It loops through three phases until a final answer is ready:</p>
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+        <div style="padding:10px 14px; border-radius:10px; background:rgba(123,63,255,0.1); border:1px solid rgba(123,63,255,0.3)">
+          <strong style="color:#c4a4ff">💭 Thought</strong><br>
+          <span style="font-size:12px;color:rgba(255,255,255,0.5)">The LLM reasons about what it needs to know and which tool to call.</span>
+        </div>
+        <div style="padding:10px 14px; border-radius:10px; background:rgba(0,200,255,0.06); border:1px solid rgba(0,200,255,0.2)">
+          <strong style="color:var(--blue)">⚡ Action</strong><br>
+          <span style="font-size:12px;color:rgba(255,255,255,0.5)">Dispatches a tool call with structured parameters.</span>
+        </div>
+        <div style="padding:10px 14px; border-radius:10px; background:rgba(0,255,136,0.05); border:1px solid rgba(0,255,136,0.15)">
+          <strong style="color:var(--green)">👁 Observation</strong><br>
+          <span style="font-size:12px;color:rgba(255,255,255,0.5)">Tool result is returned; loop continues or terminates.</span>
+        </div>
+      </div>
+      <div class="modal-stat-row" style="margin-top:16px">
+        <div class="modal-stat"><div class="val">1–3</div><div class="lbl">Avg iterations</div></div>
+        <div class="modal-stat"><div class="val">5</div><div class="lbl">Tools available</div></div>
+      </div>
+    `
+  },
+  {
+    icon: "🔧",
+    title: "Tools",
+    subtitle: "5 specialized tools — the agent picks exactly one per loop iteration",
+    body: `
+      <p>The ReAct agent selects from <strong>5 tools</strong> based on the nature of the question. Each tool is a Python function decorated with <code>@tool</code> from LangChain.</p>
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:7px">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:rgba(0,200,255,0.05);border:1px solid rgba(0,200,255,0.15)">
+          <span style="font-size:18px">🌤</span>
+          <div><strong style="color:var(--blue);font-size:12px">weather_tool</strong><br><span style="font-size:11px;color:rgba(255,255,255,0.4)">Current weather for Colombian cities via Open-Meteo</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:rgba(0,200,255,0.05);border:1px solid rgba(0,200,255,0.15)">
+          <span style="font-size:18px">🔍</span>
+          <div><strong style="color:var(--blue);font-size:12px">search_tool</strong><br><span style="font-size:11px;color:rgba(255,255,255,0.4)">Semantic search over 969 ChromaDB document chunks</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:rgba(0,200,255,0.05);border:1px solid rgba(0,200,255,0.15)">
+          <span style="font-size:18px">💬</span>
+          <div><strong style="color:var(--blue);font-size:12px">query_tool</strong><br><span style="font-size:11px;color:rgba(255,255,255,0.4)">Freeform Q&amp;A over Corona product knowledge base</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:rgba(0,200,255,0.05);border:1px solid rgba(0,200,255,0.15)">
+          <span style="font-size:18px">📊</span>
+          <div><strong style="color:var(--blue);font-size:12px">table_tool</strong><br><span style="font-size:11px;color:rgba(255,255,255,0.4)">Returns structured product comparison tables</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:rgba(0,200,255,0.05);border:1px solid rgba(0,200,255,0.15)">
+          <span style="font-size:18px">💻</span>
+          <div><strong style="color:var(--blue);font-size:12px">code_tool</strong><br><span style="font-size:11px;color:rgba(255,255,255,0.4)">Executes Python snippets for calculations or formatting</span></div>
+        </div>
+      </div>
+    `
+  },
+  {
+    icon: "🗄️",
+    title: "ChromaDB",
+    subtitle: "Vector database — semantic similarity search over Corona product catalog",
+    body: `
+      <p><strong>ChromaDB</strong> stores the entire Corona product knowledge base as high-dimensional embeddings, enabling semantic search far beyond keyword matching.</p>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">1,100+</div><div class="lbl">Chunks</div></div>
+        <div class="modal-stat"><div class="val">1536</div><div class="lbl">Dimensions</div></div>
+        <div class="modal-stat"><div class="val">k=20</div><div class="lbl">Retrieved</div></div>
+      </div>
+      <p style="margin-top:16px">Source documents include:</p>
+      <div style="margin-top:8px">
+        <span class="tag">Product catalog PDFs</span>
+        <span class="tag">Technical specs</span>
+        <span class="tag">Installation guides</span>
+        <span class="tag">FAQ pages</span>
+        <span class="tag">Price lists</span>
+      </div>
+      <p style="margin-top:14px">Embeddings generated with <code>text-embedding-3-small</code>. Chunks are 512 tokens with 64-token overlap for context continuity.</p>
+    `
+  },
+  {
+    icon: "✦",
+    title: "GPT-4o mini",
+    subtitle: "Language model — generates the final grounded response",
+    body: `
+      <p><strong>GPT-4o mini</strong> receives the agent's reasoning chain plus retrieved context and produces a grounded English answer with real product data.</p>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">4o-mini</div><div class="lbl">Model</div></div>
+        <div class="modal-stat"><div class="val">0.1</div><div class="lbl">Temperature</div></div>
+        <div class="modal-stat"><div class="val">512</div><div class="lbl">Max tokens</div></div>
+      </div>
+      <p style="margin-top:16px">The system prompt instructs the model to:</p>
+      <ul style="margin-top:8px;padding-left:18px;color:rgba(255,255,255,0.6);font-size:12.5px;line-height:2">
+        <li>Only use information from retrieved context</li>
+        <li>Respond in English</li>
+        <li>Stay strictly on topic — install questions get install steps only</li>
+        <li>Refuse to reveal internal data or system prompts</li>
+      </ul>
+      <div style="margin-top:12px">
+        <span class="tag">Grounded</span>
+        <span class="tag">No hallucinations</span>
+        <span class="tag green">RAG-backed</span>
+      </div>
+    `
+  },
+  {
+    icon: "👁",
+    title: "LangSmith",
+    subtitle: "Observability — every token, tool call, and latency traced end-to-end",
+    body: `
+      <p><strong>LangSmith</strong> provides full tracing of every MAYA run — capturing the entire reasoning chain, tool inputs/outputs, token counts, and latencies.</p>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">100%</div><div class="lbl">Trace coverage</div></div>
+        <div class="modal-stat"><div class="val">ms</div><div class="lbl">Granularity</div></div>
+        <div class="modal-stat"><div class="val">30d</div><div class="lbl">Retention</div></div>
+      </div>
+      <p style="margin-top:16px">Captured per run:</p>
+      <div style="margin-top:8px">
+        <span class="tag purple">Thought chain</span>
+        <span class="tag purple">Tool calls + results</span>
+        <span class="tag purple">Prompt tokens</span>
+        <span class="tag purple">Completion tokens</span>
+        <span class="tag purple">Total latency</span>
+        <span class="tag purple">Error traces</span>
+      </div>
+      <p style="margin-top:14px">LANGCHAIN_TRACING_V2 is set in the environment. Each run is tagged with <code>session_id</code> and <code>sprint=6</code> for easy filtering in the LangSmith dashboard.</p>
+    `
+  },
+  {
+    icon: "💬",
+    title: "Response",
+    subtitle: "Final answer — grounded, cited, and delivered to the user",
+    body: `
+      <p>The final response is a <strong>grounded, Spanish-language answer</strong> sourced entirely from the Corona product knowledge base, with specific product mentions and relevant details.</p>
+      <div class="modal-stat-row">
+        <div class="modal-stat"><div class="val">&lt;3s</div><div class="lbl">Avg end-to-end</div></div>
+        <div class="modal-stat"><div class="val">JSON</div><div class="lbl">Format</div></div>
+        <div class="modal-stat"><div class="val">0%</div><div class="lbl">Hallucination rate</div></div>
+      </div>
+      <p style="margin-top:16px">Response envelope includes:</p>
+      <div style="margin-top:8px; background:rgba(0,0,0,0.3);border:1px solid rgba(0,200,255,0.12);border-radius:10px;padding:12px;font-family:'Courier New',monospace;font-size:11px;color:rgba(255,255,255,0.6);line-height:1.8">
+        {<br>
+        &nbsp;&nbsp;"answer": "El inodoro Ibagué mide ...",<br>
+        &nbsp;&nbsp;"sources": ["catalog_2024.pdf#p12"],<br>
+        &nbsp;&nbsp;"tool_used": "search_tool",<br>
+        &nbsp;&nbsp;"run_id": "ls-abc123"<br>
+        }
+      </div>
+    `
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// CANVAS — PARTICLE SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+const canvas = document.getElementById('pipelineCanvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+let paused = false;
+let speed = 1.0;
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Stage positions (updated each frame from DOM)
+let stageRects = [];
+
+function getStageRects() {
+  stageRects = [];
+  for (let i = 0; i < 8; i++) {
+    const el = document.getElementById('stage-' + i);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    stageRects.push({ x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width/2, cy: r.top + r.height/2 });
+  }
+}
+
+// Particle class
+class Particle {
+  constructor() { this.reset(); }
+  reset() {
+    this.stageIdx = 0;
+    this.progress = 0;   // 0 → 1 within current segment
+    this.size = 3.5 + Math.random() * 2.5;
+    this.blocked = false;
+    this.blockTimer = 0;
+    this.trail = [];
+    this.color = Math.random() < 0.15 ? '#ff3fa4' : (Math.random() < 0.2 ? '#00ffe7' : '#00c8ff');
+    this.alpha = 0.85 + Math.random() * 0.15;
+    this.delay = Math.random() * 120;  // frames delay before spawning
+    this.active = false;
+  }
+
+  update() {
+    if (this.delay > 0) { this.delay -= speed; return; }
+    this.active = true;
+
+    if (this.blocked) {
+      this.blockTimer -= speed;
+      if (this.blockTimer <= 0) this.reset();
+      return;
+    }
+
+    if (stageRects.length < 8) return;
+
+    // Move progress
+    const spd = 0.008 * speed;
+    this.progress += spd;
+
+    if (this.progress >= 1) {
+      this.progress = 0;
+      this.stageIdx++;
+      if (this.stageIdx >= stageRects.length) {
+        this.reset();
+        this.delay = 10 + Math.random() * 60;
+        return;
+      }
+      // 10% chance blocked at stage 1 (guard)
+      if (this.stageIdx === 1 && Math.random() < 0.10) {
+        this.blocked = true;
+        this.blockTimer = 60;
+        flashBlock();
+      }
+    }
+
+    const src = stageRects[this.stageIdx];
+    const dst = this.stageIdx < stageRects.length - 1 ? stageRects[this.stageIdx + 1] : src;
+
+    this.x = lerp(src.cx, dst.cx, this.progress);
+    this.y = lerp(src.cy, dst.cy, this.progress);
+
+    // Trail
+    this.trail.unshift({ x: this.x, y: this.y });
+    if (this.trail.length > 16) this.trail.pop();
+  }
+
+  draw() {
+    if (!this.active || this.blocked) return;
+    // Trail
+    for (let i = 0; i < this.trail.length; i++) {
+      const a = ((1 - i / this.trail.length) * this.alpha * 0.4);
+      const r = this.size * (1 - i / this.trail.length) * 0.7;
+      ctx.beginPath();
+      ctx.arc(this.trail[i].x, this.trail[i].y, r, 0, Math.PI * 2);
+      ctx.fillStyle = hexAlpha(this.color, a);
+      ctx.fill();
+    }
+    // Core glow
+    const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size * 3);
+    grd.addColorStop(0, hexAlpha(this.color, this.alpha));
+    grd.addColorStop(0.4, hexAlpha(this.color, this.alpha * 0.5));
+    grd.addColorStop(1, hexAlpha(this.color, 0));
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+}
+
+// Blocked explosion
+let blockParticles = [];
+
+function flashBlock() {
+  const guard = stageRects[1];
+  if (!guard) return;
+  for (let i = 0; i < 12; i++) {
+    const angle = (Math.PI * 2 * i) / 12;
+    blockParticles.push({
+      x: guard.cx, y: guard.cy,
+      vx: Math.cos(angle) * (2 + Math.random() * 3),
+      vy: Math.sin(angle) * (2 + Math.random() * 3),
+      life: 40, maxLife: 40,
+    });
+  }
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function hexAlpha(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// Build particles
+const particles = Array.from({ length: 18 }, () => new Particle());
+
+// Ambient background particles (stars)
+const stars = Array.from({ length: 80 }, () => ({
+  x: Math.random(), y: Math.random(),
+  r: 0.5 + Math.random() * 1.2,
+  a: 0.1 + Math.random() * 0.4,
+  speed: 0.2 + Math.random() * 0.5,
+  phase: Math.random() * Math.PI * 2
+}));
+
+let frame = 0;
+
+function drawPipelineTube() {
+  if (stageRects.length < 2) return;
+  const y0 = stageRects[0].cy;
+  for (let i = 0; i < stageRects.length - 1; i++) {
+    const a = stageRects[i];
+    const b = stageRects[i + 1];
+    const x1 = a.cx + a.w / 2;
+    const x2 = b.cx - b.w / 2;
+
+    // Tube shadow
+    ctx.beginPath();
+    ctx.moveTo(x1, a.cy - 4);
+    ctx.lineTo(x2, b.cy - 4);
+    ctx.lineTo(x2, b.cy + 4);
+    ctx.lineTo(x1, a.cy + 4);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,200,255,0.04)';
+    ctx.fill();
+
+    // Tube outline
+    ctx.beginPath();
+    ctx.moveTo(x1, a.cy);
+    ctx.lineTo(x2, b.cy);
+    ctx.strokeStyle = `rgba(0,200,255,${0.12 + 0.06 * Math.sin(frame * 0.04 + i)})`;
+    ctx.lineWidth = 7;
+    ctx.stroke();
+
+    // Inner glow line
+    ctx.beginPath();
+    ctx.moveTo(x1, a.cy);
+    ctx.lineTo(x2, b.cy);
+    ctx.strokeStyle = `rgba(0,200,255,${0.25 + 0.1 * Math.sin(frame * 0.06 + i)})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+
+function drawStars() {
+  for (const s of stars) {
+    const a = s.a * (0.5 + 0.5 * Math.sin(frame * 0.01 * s.speed + s.phase));
+    ctx.beginPath();
+    ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,200,255,${a})`;
+    ctx.fill();
+  }
+}
+
+function loop() {
+  ctx.clearRect(0, 0, W, H);
+  frame++;
+
+  getStageRects();
+  drawStars();
+  drawPipelineTube();
+
+  if (!paused) {
+    for (const p of particles) {
+      p.update();
+      p.draw();
+    }
+  } else {
+    for (const p of particles) p.draw();
+  }
+
+  // Block explosion particles
+  blockParticles = blockParticles.filter(b => b.life > 0);
+  for (const b of blockParticles) {
+    b.x += b.vx; b.y += b.vy;
+    b.vx *= 0.93; b.vy *= 0.93;
+    b.life -= 1;
+    const a = b.life / b.maxLife;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,59,59,${a})`;
+    ctx.fill();
+    // glow
+    const grd = ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,8);
+    grd.addColorStop(0,`rgba(255,59,59,${a*0.5})`);
+    grd.addColorStop(1,'rgba(255,59,59,0)');
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+  }
+
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ═══════════════════════════════════════════════════════════════════
+// TYPING ANIMATION
+// ═══════════════════════════════════════════════════════════════════
+const typingEl = document.getElementById('typing-display');
+let qIdx = 0, charIdx = 0, typing = true, pauseTimer = 0;
+
+function typeStep() {
+  const q = QUESTIONS[qIdx];
+  if (typing) {
+    charIdx++;
+    if (charIdx > q.length) { typing = false; pauseTimer = 90; }
+  } else {
+    pauseTimer--;
+    if (pauseTimer <= 0) {
+      charIdx--;
+      if (charIdx < 0) {
+        charIdx = 0; typing = true;
+        qIdx = (qIdx + 1) % QUESTIONS.length;
+      }
+    }
+  }
+  typingEl.innerHTML = `<span style="color:rgba(0,200,255,0.75);font-size:8px">${q.slice(0, charIdx)}</span><span class="cursor"></span>`;
+  setTimeout(typeStep, typing ? 55 : (pauseTimer > 0 ? 12 : 40));
+}
+setTimeout(typeStep, 800);
+
+// ═══════════════════════════════════════════════════════════════════
+// REACT LOOP ANIMATION
+// ═══════════════════════════════════════════════════════════════════
+let reactIdx = 0;
+function animateReact() {
+  document.querySelectorAll('.react-step').forEach((el, i) => {
+    el.classList.toggle('lit', i === reactIdx);
+  });
+  reactIdx = (reactIdx + 1) % 3;
+}
+setInterval(animateReact, 900);
+
+// ═══════════════════════════════════════════════════════════════════
+// TOOL BRANCH ANIMATION
+// ═══════════════════════════════════════════════════════════════════
+let toolIdx = 0;
+function animateTool() {
+  document.querySelectorAll('.tool-branch').forEach((el, i) => {
+    el.classList.toggle('lit', i === toolIdx);
+  });
+  toolIdx = (toolIdx + 1) % 5;
+}
+setInterval(animateTool, 1100);
+
+// ═══════════════════════════════════════════════════════════════════
+// ACTIVE STAGE HIGHLIGHT (follows particle)
+// ═══════════════════════════════════════════════════════════════════
+function updateActiveStage() {
+  // Find the majority particle stage
+  const counts = new Array(8).fill(0);
+  for (const p of particles) {
+    if (p.active && !p.blocked && p.stageIdx < 8) counts[p.stageIdx]++;
+  }
+  const maxStage = counts.indexOf(Math.max(...counts));
+  document.querySelectorAll('.stage').forEach((el, i) => {
+    el.classList.toggle('active', i === maxStage);
+  });
+}
+setInterval(updateActiveStage, 200);
+
+// ═══════════════════════════════════════════════════════════════════
+// TICKER
+// ═══════════════════════════════════════════════════════════════════
+const tickerInner = document.getElementById('ticker-inner');
+const allQ = [...QUESTIONS, ...QUESTIONS]; // doubled for seamless loop
+tickerInner.innerHTML = allQ.map(q =>
+  `<span class="tick-item"><span class="tick-q">${q}</span></span>`
+).join('');
+
+// ═══════════════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════════════
+const modal = document.getElementById('modal');
+
+function openModal(idx) {
+  const d = MODAL_DATA[idx];
+  document.getElementById('modal-icon').textContent = d.icon;
+  document.getElementById('modal-title').textContent = d.title;
+  document.getElementById('modal-subtitle').textContent = d.subtitle;
+  document.getElementById('modal-body').innerHTML = d.body;
+  modal.classList.add('open');
+  paused = true;
+}
+
+function closeModal() {
+  modal.classList.remove('open');
+  paused = false;
+}
+
+function closeModalOnBg(e) {
+  if (e.target === modal) closeModal();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (!modal.classList.contains('open')) {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); sChangeSlide(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); sChangeSlide(-1); }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// SLIDE SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+const TOTAL_SLIDES = 10;
+let currentSlide = 1;
+const overlay = document.getElementById('slide-overlay');
+const hdrNum  = document.getElementById('hdr-slide-num');
+const hint    = document.getElementById('pipeline-hint');
+const dotsEl  = document.getElementById('s-dots');
+
+// Build dots
+for (let i = 1; i <= TOTAL_SLIDES; i++) {
+  const d = document.createElement('div');
+  d.className = 's-dot' + (i === 1 ? ' active' : '');
+  d.onclick = () => sGoTo(i);
+  dotsEl.appendChild(d);
+}
+
+function sGoTo(n) {
+  // Hide current slide content
+  const prev = document.getElementById('s' + currentSlide);
+  if (prev) prev.classList.remove('active');
+
+  currentSlide = n;
+
+  // Show next slide content
+  const next = document.getElementById('s' + currentSlide);
+  if (next) next.classList.add('active');
+
+  // Slide 5 = pipeline — make overlay transparent
+  if (currentSlide === 5) {
+    overlay.classList.add('pipeline-active');
+    document.getElementById('controls').style.display = 'flex';
+    document.getElementById('legend').style.display   = 'flex';
+    document.getElementById('ticker').style.display   = 'flex';
+    hint.style.display = 'block';
+    dotsEl.style.display = 'none';
+  } else {
+    overlay.classList.remove('pipeline-active');
+    document.getElementById('controls').style.display = 'none';
+    document.getElementById('legend').style.display   = 'none';
+    document.getElementById('ticker').style.display   = 'none';
+    hint.style.display = 'none';
+    dotsEl.style.display = 'flex';
+  }
+
+  // Update dots
+  document.querySelectorAll('.s-dot').forEach((d, i) => d.classList.toggle('active', i + 1 === currentSlide));
+
+  // Update header counter
+  hdrNum.textContent = String(currentSlide).padStart(2,'0') + ' / ' + String(TOTAL_SLIDES).padStart(2,'0');
+}
+
+function sChangeSlide(dir) {
+  let n = currentSlide + dir;
+  if (n < 1) n = TOTAL_SLIDES;
+  if (n > TOTAL_SLIDES) n = 1;
+  sGoTo(n);
+}
+
+// Touch support
+let sTouchX = 0;
+document.addEventListener('touchstart', e => { sTouchX = e.touches[0].clientX; });
+document.addEventListener('touchend', e => {
+  const diff = sTouchX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 50) sChangeSlide(diff > 0 ? 1 : -1);
+});
+
+// Init — hide pipeline controls on load (start on slide 1)
+sGoTo(1);
+
+// ═══════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('btn-pause').addEventListener('click', () => {
+  paused = !paused;
+  document.getElementById('btn-pause').textContent = paused ? '▶' : '⏸';
+});
+document.getElementById('btn-faster').addEventListener('click', () => {
+  speed = Math.min(3, speed + 0.4);
+});
+document.getElementById('btn-slower').addEventListener('click', () => {
+  speed = Math.max(0.2, speed - 0.3);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// SCALE TO FIT
+// ═══════════════════════════════════════════════════════════════════
+function fitPipeline() {
+  const wrapper = document.getElementById('pipeline-wrapper');
+  if (!wrapper) return;
+  const rect = wrapper.getBoundingClientRect();
+  const sceneW = window.innerWidth - 80;
+  const sceneH = window.innerHeight - 120;
+  const scaleX = sceneW / rect.width;
+  const scaleY = sceneH / rect.height;
+  const scale = Math.min(scaleX, scaleY, 1.1);
+  wrapper.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitPipeline);
+setTimeout(fitPipeline, 100);
+
+</script>
+</body>
+</html>

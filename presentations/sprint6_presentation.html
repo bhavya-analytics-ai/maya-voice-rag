@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAYA Sprint 6 · Corona Review Intelligence</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #080812;
+  --blue: #00c8ff;
+  --cyan: #00ffe7;
+  --purple: #7b3fff;
+  --green: #00ff88;
+  --red: #ff3b3b;
+  --orange: #ff7b00;
+  --card-bg: rgba(0,200,255,0.04);
+  --card-border: rgba(0,200,255,0.18);
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: #e0f4ff;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+.grid-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0,200,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,255,0.025) 1px, transparent 1px);
+  background-size: 52px 52px;
+}
+
+.scanlines {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.025) 2px, rgba(0,0,0,0.025) 4px
+  );
+}
+
+.header-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 32px;
+  background: rgba(8,8,18,0.75);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(0,200,255,0.08);
+}
+.logo { font-size: 11px; font-weight: 700; letter-spacing: 3px; color: var(--blue); text-transform: uppercase; }
+.badge {
+  font-size: 10px; letter-spacing: 2px;
+  background: rgba(0,200,255,0.07);
+  border: 1px solid rgba(0,200,255,0.2);
+  border-radius: 20px; padding: 4px 12px; color: var(--cyan);
+}
+
+.slide-num {
+  position: fixed; top: 13px; right: 32px; z-index: 101;
+  font-size: 11px; letter-spacing: 2px; color: rgba(0,200,255,0.35);
+}
+
+.deck { width: 100vw; height: 100vh; position: relative; }
+
+.slide {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.55s ease, transform 0.55s ease;
+  transform: translateX(50px);
+  z-index: 2;
+}
+.slide.active { opacity: 1; pointer-events: auto; transform: translateX(0); }
+.slide.exit { opacity: 0; transform: translateX(-50px); }
+
+.content {
+  width: 100%; max-width: 1160px;
+  padding: 80px 56px 72px;
+  position: relative; z-index: 3;
+}
+
+.blob {
+  position: absolute; border-radius: 50%;
+  filter: blur(100px); pointer-events: none; z-index: 1;
+  animation: blobFloat 18s ease-in-out infinite;
+}
+@keyframes blobFloat {
+  0%,100% { transform: translate(0,0); }
+  33% { transform: translate(35px,-22px); }
+  66% { transform: translate(-20px,18px); }
+}
+
+.label {
+  font-size: 10px; font-weight: 700; letter-spacing: 3.5px;
+  text-transform: uppercase; color: rgba(0,200,255,0.45);
+  margin-bottom: 10px;
+}
+
+h1 {
+  font-size: clamp(2.6rem, 5.5vw, 4.8rem);
+  font-weight: 900; line-height: 1.05; letter-spacing: -1px;
+}
+h2 {
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 800; line-height: 1.15; letter-spacing: -0.5px;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  padding: 22px;
+}
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+.stat-card {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(0,200,255,0.14);
+  border-radius: 14px; padding: 18px;
+  text-align: center;
+}
+.stat-val { font-size: 2rem; font-weight: 800; color: var(--cyan); }
+.stat-lbl { font-size: 9.5px; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin-top: 4px; text-transform: uppercase; }
+
+.tag {
+  display: inline-block;
+  background: rgba(0,200,255,0.07);
+  border: 1px solid rgba(0,200,255,0.2);
+  border-radius: 8px; padding: 3px 9px;
+  font-size: 10.5px; color: var(--cyan); margin: 2px;
+}
+.tag.green { background: rgba(0,255,136,0.06); border-color: rgba(0,255,136,0.2); color: var(--green); }
+.tag.purple { background: rgba(123,63,255,0.08); border-color: rgba(123,63,255,0.25); color: #c4a4ff; }
+.tag.red { background: rgba(255,59,59,0.07); border-color: rgba(255,59,59,0.25); color: var(--red); }
+.tag.orange { background: rgba(255,123,0,0.07); border-color: rgba(255,123,0,0.25); color: var(--orange); }
+
+.text-sm { font-size: 12.5px; color: rgba(255,255,255,0.5); line-height: 1.65; }
+.text-md { font-size: 14.5px; color: rgba(255,255,255,0.62); line-height: 1.65; }
+
+.check-item {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(0,200,255,0.06);
+  font-size: 13.5px;
+}
+.check-icon { color: var(--green); font-size: 15px; flex-shrink: 0; margin-top: 2px; }
+
+.code-block {
+  background: rgba(0,0,0,0.45);
+  border: 1px solid rgba(0,200,255,0.12);
+  border-radius: 12px; padding: 16px 18px;
+  font-family: 'Courier New', monospace;
+  font-size: 11.5px; line-height: 1.85;
+  color: rgba(255,255,255,0.6);
+}
+.code-block .kw { color: var(--cyan); }
+.code-block .str { color: #ffb86c; }
+.code-block .cm { color: rgba(255,255,255,0.28); }
+
+.pipe-row { display: flex; align-items: flex-start; gap: 6px; width: 100%; }
+.pipe-stage {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 13px; padding: 14px 10px;
+  text-align: center; flex: 1; min-width: 0;
+}
+.pipe-arrow { color: rgba(0,200,255,0.4); font-size: 18px; flex-shrink: 0; margin-top: 22px; }
+
+.react-step {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 16px; border-radius: 11px; margin-bottom: 9px;
+  border: 1px solid rgba(0,200,255,0.14);
+  background: rgba(0,200,255,0.04);
+  font-size: 13px;
+}
+
+.tool-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 13px; border-radius: 10px; margin-bottom: 6px;
+  background: rgba(0,200,255,0.03);
+  border: 1px solid rgba(0,200,255,0.1);
+  font-size: 13px;
+}
+
+.before-card {
+  border-color: rgba(255,59,59,0.3) !important;
+  background: rgba(255,59,59,0.03) !important;
+}
+.after-card {
+  border-color: rgba(0,255,136,0.28) !important;
+  background: rgba(0,255,136,0.03) !important;
+}
+
+.row-item {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12.5px; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px;
+}
+
+.demo-q {
+  display: flex; align-items: center; gap: 14px;
+  padding: 13px 17px; border-radius: 12px; margin-bottom: 9px;
+  background: rgba(0,200,255,0.03);
+  border: 1px solid rgba(0,200,255,0.13);
+  font-size: 13.5px; color: rgba(255,255,255,0.72);
+}
+.demo-num { color: var(--blue); font-size: 10px; font-weight: 700; letter-spacing: 2px; width: 22px; flex-shrink: 0; }
+
+.nav {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px; z-index: 100;
+  background: rgba(8,8,18,0.88);
+  border: 1px solid rgba(0,200,255,0.14);
+  border-radius: 50px; padding: 9px 20px;
+  backdrop-filter: blur(14px);
+}
+.nav-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--blue); font-size: 22px; padding: 2px 8px;
+  transition: color 0.2s; line-height: 1;
+}
+.nav-btn:hover { color: var(--cyan); }
+.dots { display: flex; gap: 7px; }
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(0,200,255,0.18); cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--blue); transform: scale(1.35); }
+.nav-counter { font-size: 11px; color: rgba(255,255,255,0.28); min-width: 38px; text-align: center; }
+
+.mt-1 { margin-top: 8px; }
+.mt-2 { margin-top: 16px; }
+.mt-3 { margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="scanlines"></div>
+
+<div class="header-bar">
+  <div class="logo">MAYA · Corona Review Intelligence</div>
+  <div class="badge">SPRINT 6</div>
+</div>
+<div class="slide-num" id="slideNum">01 / 10</div>
+
+<div class="deck">
+
+<!-- ══════════════════════════════════════ SLIDE 1: TITLE -->
+<div class="slide active" data-slide="1">
+  <div class="blob" style="width:520px;height:520px;top:-110px;right:-80px;background:#00c8ff;opacity:0.055"></div>
+  <div class="blob" style="width:360px;height:360px;bottom:-70px;left:-60px;background:#7b3fff;opacity:0.07;animation-duration:22s"></div>
+  <div class="content" style="text-align:center">
+    <div class="label" style="margin-bottom:18px">Data Science Bootcamp · Sprint 6</div>
+    <h1 style="margin-bottom:18px">
+      <span style="color:var(--blue)">Corona</span> Review<br>
+      Intelligence <span style="background:linear-gradient(90deg,var(--blue),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent">MAYA</span>
+    </h1>
+    <p class="text-md" style="margin-bottom:36px;max-width:560px;margin-left:auto;margin-right:auto">
+      Agent-Powered AI Chatbot · 221 Real Customer Reviews · 49 Toilet Products
+    </p>
+    <div class="card" style="max-width:620px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:28px;text-align:left">
+      <div>
+        <div class="label" style="margin-bottom:14px">Presented By</div>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;color:rgba(255,255,255,0.68)">
+          <div>Bhavya Pandya</div>
+          <div>Abhishek Raval</div>
+          <div>Tirth Bharodiya</div>
+          <div>Gurleen Sabharwal</div>
+        </div>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:14px">Under Guidance Of</div>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;color:rgba(255,255,255,0.68)">
+          <div>Juan Jaramillo</div>
+          <div>Juan Felipe Mansalvo</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SLIDE 2: THE PROBLEM -->
+<div class="slide" data-slide="2">
+  <div class="blob" style="width:420px;height:420px;top:-80px;right:-60px;background:#ff3b3b;opacity:0.055"></div>
+  <div class="content">
+    <div class="label">Why We Had To Fix Everything First</div>
+    <h2 style="margin-bottom:22px">Sprint 5 gave <span style="color:var(--red)">generic answers</span></h2>
+    <div class="grid-2">
+      <div class="card before-card">
+        <div class="label" style="color:rgba(255,59,59,0.55)">The Failure</div>
+        <p class="text-md" style="margin:10px 0 12px">Ask MAYA: <em style="color:rgba(255,255,255,0.8)">"How do I install the Nyren?"</em></p>
+        <div style="background:rgba(255,59,59,0.07);border:1px solid rgba(255,59,59,0.2);border-radius:10px;padding:13px;font-size:12.5px;color:rgba(255,255,255,0.55);font-style:italic;line-height:1.6">
+          "Please refer to the installation instructions that come with your product."
+        </div>
+        <div class="mt-2">
+          <span class="tag red">Root Cause 1</span>
+          <p class="text-sm mt-1">Nyren PDFs are image-based scans. PyMuPDF extracted 0 text. ChromaDB had empty chunks — no data to answer from.</p>
+        </div>
+        <div class="mt-2">
+          <span class="tag red">Root Cause 2</span>
+          <p class="text-sm mt-1">vectorstore.get() returns chunks in random insertion order. Chunk 0 was the cover page, not the installation steps.</p>
+        </div>
+      </div>
+      <div class="card after-card">
+        <div class="label" style="color:rgba(0,255,136,0.55)">The Fix</div>
+        <p class="text-md" style="margin:10px 0 12px">Same question after Sprint 6:</p>
+        <div style="background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.2);border-radius:10px;padding:13px;font-size:12.5px;color:rgba(255,255,255,0.65);line-height:1.6">
+          "Step 1: Shut off the water supply valve. Step 2: Remove the toilet tank lid. Step 3..."
+          <span style="color:var(--green);display:block;margin-top:6px">↑ Real steps from the 32-page installation manual</span>
+        </div>
+        <div class="mt-2">
+          <span class="tag green">Fix 1 — Vision OCR</span>
+          <p class="text-sm mt-1">GPT-4o-mini converts every PDF page to PNG and extracts all text. Nyren went from 5 chunks to 162.</p>
+        </div>
+        <div class="mt-2">
+          <span class="tag green">Fix 2 — Source Filter</span>
+          <p class="text-sm mt-1">PRODUCT_SOURCE_MAP + similarity_search with filter ranks chunks by relevance. Cover page never appears.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SLIDE 3: WHAT WE BUILT -->
+<div class="slide" data-slide="3">
+  <div class="blob" style="width:400px;height:400px;top:-80px;left:-60px;background:#7b3fff;opacity:0.07"></div>
+  <div class="content">
+    <div class="label">Sprint 6 Deliverables</div>
+    <h2 style="margin-bottom:22px">Everything we <span style="color:var(--cyan)">shipped</span></h2>
+    <div class="grid-2">
+      <div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <div><strong>LangGraph ReAct Agent</strong><span class="text-sm" style="display:block;margin-top:3px">create_react_agent replaces the old RAG chain — Thought → Action → Observation reasoning loop</span></div>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <div><strong>5 Agent Tools</strong><span class="text-sm" style="display:block;margin-top:3px">Weather, web search, DB query, table generator, code execution — all @tool decorated</span></div>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <div><strong>GPT-4o-mini Vision OCR</strong><span class="text-sm" style="display:block;margin-top:3px">All 3 image-based PDFs re-ingested — 162 Nyren chunks from 32 pages (was 5)</span></div>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <div><strong>PRODUCT_SOURCE_MAP</strong><span class="text-sm" style="display:block;margin-top:3px">Targeted retrieval — similarity_search with source filter fixes random chunk ordering</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <div><strong>LangSmith Tracing Fixed</strong><span class="text-sm" style="display:block;margin-top:3px">Env vars set before LangChain imports — every tool call, token, and latency traced</span></div>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <div><strong>Graphify Knowledge Graph</strong><span class="text-sm" style="display:block;margin-top:3px">186 nodes, 236 edges, 23 communities — architectural insights across full codebase</span></div>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <div><strong>MCP Server</strong><span class="text-sm" style="display:block;margin-top:3px">6 tools exposed via Model Context Protocol — any AI client can connect via fastmcp</span></div>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">✓</span>
+          <div><strong>Prompt Injection Protection</strong><span class="text-sm" style="display:block;margin-top:3px">8 regex patterns block jailbreaks before the LLM is ever called</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SLIDE 4: DATA & INGESTION -->
+<div class="slide" data-slide="4">
+  <div class="blob" style="width:380px;height:380px;top:-70px;right:-50px;background:#00c8ff;opacity:0.055"></div>
+  <div class="content">
+    <div class="label">Data & Ingestion</div>
+    <h2 style="margin-bottom:22px">From <span style="color:var(--red)">0 text</span> to <span style="color:var(--green)">1,100+ chunks</span></h2>
+    <div class="grid-4" style="margin-bottom:18px">
+      <div class="stat-card"><div class="stat-val">221</div><div class="stat-lbl">Reviews</div></div>
+      <div class="stat-card"><div class="stat-val">49</div><div class="stat-lbl">Products</div></div>
+      <div class="stat-card"><div class="stat-val">1,100+</div><div class="stat-lbl">Chunks</div></div>
+      <div class="stat-card"><div class="stat-val">32</div><div class="stat-lbl">OCR Pages</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card before-card">
+        <div class="label" style="color:rgba(255,59,59,0.55)">Before — Sprint 5</div>
+        <div class="mt-1">
+          <div class="row-item" style="background:rgba(255,59,59,0.05);border:1px solid rgba(255,59,59,0.14)">
+            <span class="text-sm">Nyren Install Guide (32 pages)</span><span style="color:var(--red);font-size:12px">~5 chunks</span>
+          </div>
+          <div class="row-item" style="background:rgba(255,59,59,0.05);border:1px solid rgba(255,59,59,0.14)">
+            <span class="text-sm">Nyren Ficha Técnica</span><span style="color:var(--red);font-size:12px">0 chunks</span>
+          </div>
+          <div class="row-item" style="background:rgba(255,59,59,0.05);border:1px solid rgba(255,59,59,0.14)">
+            <span class="text-sm">Aluvia Plus RD Spec Sheet</span><span style="color:var(--red);font-size:12px">5 chunks</span>
+          </div>
+        </div>
+        <p class="text-sm mt-2">Image-based scans. PyMuPDF extracted almost nothing — ChromaDB had empty chunks.</p>
+      </div>
+      <div class="card after-card">
+        <div class="label" style="color:rgba(0,255,136,0.55)">After — Vision OCR</div>
+        <div class="mt-1">
+          <div class="row-item" style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.14)">
+            <span class="text-sm">Nyren Install Guide</span><span style="color:var(--green);font-size:12px">162 chunks ↑</span>
+          </div>
+          <div class="row-item" style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.14)">
+            <span class="text-sm">Nyren Ficha Técnica</span><span style="color:var(--green);font-size:12px">7 chunks ↑</span>
+          </div>
+          <div class="row-item" style="background:rgba(0,255,136,0.04);border:1px solid rgba(0,255,136,0.14)">
+            <span class="text-sm">Aluvia Plus RD</span><span style="color:var(--green);font-size:12px">17 chunks ↑</span>
+          </div>
+        </div>
+        <p class="text-sm mt-2">Every page → PNG → GPT-4o-mini extracts all text, specs, steps, and warnings.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SLIDE 5: PIPELINE -->
+<div class="slide" data-slide="5">
+  <div class="blob" style="width:360px;height:360px;top:-60px;right:-40px;background:#00ffe7;opacity:0.045"></div>
+  <div class="content">
+    <div class="label">System Architecture</div>
+    <h2 style="margin-bottom:30px">How a question becomes an <span style="color:var(--cyan)">answer</span></h2>
+    <div class="pipe-row" style="margin-bottom:18px">
+      <div class="pipe-stage">
+        <div style="font-size:22px;margin-bottom:7px">⌨️</div>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:1.5px;color:var(--blue)">USER INPUT</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.35);margin-top:3px">Customer question</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage" style="border-color:rgba(255,59,59,0.3);background:rgba(255,59,59,0.03)">
+        <div style="font-size:22px;margin-bottom:7px">🛡️</div>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:1.5px;color:var(--red)">GUARD</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.35);margin-top:3px">8 regex patterns</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage" style="border-color:rgba(123,63,255,0.35);background:rgba(123,63,255,0.04)">
+        <div style="font-size:22px;margin-bottom:7px">🧠</div>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:1.5px;color:#c4a4ff">REACT AGENT</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.35);margin-top:3px">LangGraph</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage">
+        <div style="font-size:22px;margin-bottom:7px">🔧</div>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:1.5px;color:var(--blue)">TOOLS</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.35);margin-top:3px">5 tools</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage">
+        <div style="font-size:22px;margin-bottom:7px">🗄️</div>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:1.5px;color:var(--blue)">CHROMADB</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.35);margin-top:3px">1,100+ chunks</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage">
+        <div style="font-size:22px;margin-bottom:7px">✦</div>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:1.5px;color:var(--blue)">GPT-4o-mini</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.35);margin-top:3px">OpenAI</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage">
+        <div style="font-size:22px;margin-bottom:7px">👁</div>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:1.5px;color:var(--blue)">LANGSMITH</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.35);margin-top:3px">Full tracing</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-stage" style="border-color:rgba(0,255,231,0.32);background:rgba(0,255,231,0.04)">
+        <div style="font-size:22px;margin-bottom:7px">✅</div>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:1.5px;color:var(--cyan)">RESPONSE</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.35);margin-top:3px">Real answer</div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card before-card" style="padding:16px">
+        <div class="label" style="color:rgba(255,59,59,0.5)">Sprint 5 Pipeline</div>
+        <p class="text-sm" style="margin-top:6px">Question → embedding → random k=8 chunks → GPT-4o-mini → generic answer</p>
+      </div>
+      <div class="card after-card" style="padding:16px">
+        <div class="label" style="color:rgba(0,255,136,0.5)">Sprint 6 Pipeline</div>
+        <p class="text-sm" style="margin-top:6px">Question → detect product → PRODUCT_SOURCE_MAP → similarity_search with filter → ranked chunks → GPT-4o-mini → real answer</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SLIDE 6: ACCURACY FIX -->
+<div class="slide" data-slide="6">
+  <div class="blob" style="width:400px;height:400px;top:-70px;left:-55px;background:#00ff88;opacity:0.045"></div>
+  <div class="content">
+    <div class="label">The Core Fix</div>
+    <h2 style="margin-bottom:22px">PRODUCT_SOURCE_MAP — <span style="color:var(--green)">targeted retrieval</span></h2>
+    <div class="grid-2">
+      <div>
+        <p class="text-md" style="margin-bottom:14px">When a question mentions a product + technical keyword, skip generic search. Go straight to that product's actual source document:</p>
+        <div class="code-block">
+<span class="cm"># Map: product keyword → source files</span>
+<span class="kw">PRODUCT_SOURCE_MAP</span> = {
+  <span class="str">"nyren"</span>:   [<span class="str">"nyren-instalacion.pdf"</span>,
+               <span class="str">"nyren-ficha-tecnica.pdf"</span>],
+  <span class="str">"aluvia"</span>:  [<span class="str">"Sanitario_Aluvia_Plus.docx"</span>,
+               <span class="str">"Aluvia-RD.pdf"</span>],
+  <span class="str">"cascade"</span>: [<span class="str">"Sanitario_Cascade.docx"</span>],
+  <span class="str">"cima"</span>:    [<span class="str">"Sanitario_Cima.docx"</span>],
+}
+
+<span class="cm"># similarity_search WITH source filter</span>
+ranked = _vectorstore.<span class="kw">similarity_search</span>(
+  question, k=<span class="str">20</span>,
+  filter={<span class="str">"source"</span>: src}  <span class="cm"># ← ranked by relevance</span>
+)
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card before-card">
+          <div class="label" style="color:rgba(255,59,59,0.5)">Why .get() was wrong</div>
+          <p class="text-sm mt-1">vectorstore.get() returns chunks in random insertion order. Chunk 0 = cover page. LLM had no real content — returned a generic placeholder answer every time.</p>
+        </div>
+        <div class="card after-card">
+          <div class="label" style="color:rgba(0,255,136,0.5)">Why filter works</div>
+          <p class="text-sm mt-1">similarity_search ranks chunks by cosine distance to the question. Installation steps rank #1 for "how do I install". The cover page doesn't appear.</p>
+        </div>
+        <div class="card">
+          <div class="label">Verified working</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
+            <span class="tag green">Nyren install steps</span>
+            <span class="tag green">Aluvia maintenance</span>
+            <span class="tag green">Cascade specs</span>
+            <span class="tag green">Cima dimensions</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SLIDE 7: REACT AGENT -->
+<div class="slide" data-slide="7">
+  <div class="blob" style="width:380px;height:380px;top:-65px;right:-50px;background:#7b3fff;opacity:0.075"></div>
+  <div class="content">
+    <div class="label">Agent Architecture</div>
+    <h2 style="margin-bottom:22px">LangGraph <span style="color:#c4a4ff">ReAct</span> Agent</h2>
+    <div class="grid-2">
+      <div>
+        <div class="react-step">
+          <span style="font-size:22px;flex-shrink:0">💭</span>
+          <div>
+            <div style="font-weight:700;color:#c4a4ff;font-size:13px;margin-bottom:4px">THOUGHT</div>
+            <p class="text-sm">Agent reasons about what it needs — which tool to call, what information is missing, whether it has enough to answer</p>
+          </div>
+        </div>
+        <div class="react-step">
+          <span style="font-size:22px;flex-shrink:0">⚡</span>
+          <div>
+            <div style="font-weight:700;color:var(--blue);font-size:13px;margin-bottom:4px">ACTION</div>
+            <p class="text-sm">Dispatches a tool call with structured parameters — one tool per loop iteration</p>
+          </div>
+        </div>
+        <div class="react-step">
+          <span style="font-size:22px;flex-shrink:0">👁</span>
+          <div>
+            <div style="font-weight:700;color:var(--green);font-size:13px;margin-bottom:4px">OBSERVATION</div>
+            <p class="text-sm">Reads tool result — loop continues or terminates with the final grounded answer</p>
+          </div>
+        </div>
+        <div class="code-block mt-2" style="font-size:11px">
+<span class="cm"># langgraph.prebuilt — not langchain.agents</span>
+agent = <span class="kw">create_react_agent</span>(llm, TOOLS)
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;color:rgba(0,200,255,0.4);margin-bottom:10px">5 TOOLS</div>
+        <div class="tool-row"><span style="font-size:17px">🌤</span><div><strong style="font-size:13px">get_weather</strong><span class="text-sm" style="display:block">wttr.in — live weather, no API key needed</span></div></div>
+        <div class="tool-row"><span style="font-size:17px">🔍</span><div><strong style="font-size:13px">web_search</strong><span class="text-sm" style="display:block">DuckDuckGo via ddgs — SP500 price, current events</span></div></div>
+        <div class="tool-row"><span style="font-size:17px">🗄️</span><div><strong style="font-size:13px">query_products</strong><span class="text-sm" style="display:block">ChromaDB similarity search — 1,100+ chunks</span></div></div>
+        <div class="tool-row"><span style="font-size:17px">📊</span><div><strong style="font-size:13px">generate_product_table</strong><span class="text-sm" style="display:block">HTML comparison table — water use, ADA, dimensions</span></div></div>
+        <div class="tool-row"><span style="font-size:17px">💻</span><div><strong style="font-size:13px">execute_code</strong><span class="text-sm" style="display:block">Safe Python sandbox — calculations, statistics</span></div></div>
+        <div class="mt-2">
+          <span class="tag purple">LangSmith traces every step</span>
+          <span class="tag purple">strip_markdown() on output</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SLIDE 8: GRAPHIFY -->
+<div class="slide" data-slide="8">
+  <div class="blob" style="width:360px;height:360px;top:-60px;right:-45px;background:#00c8ff;opacity:0.055"></div>
+  <div class="content">
+    <div class="label">Codebase Intelligence</div>
+    <h2 style="margin-bottom:22px">Graphify <span style="color:var(--blue)">Knowledge Graph</span></h2>
+    <div class="grid-2">
+      <div>
+        <div class="grid-2" style="margin-bottom:16px;gap:10px">
+          <div class="stat-card"><div class="stat-val">186</div><div class="stat-lbl">Nodes</div></div>
+          <div class="stat-card"><div class="stat-val">236</div><div class="stat-lbl">Edges</div></div>
+          <div class="stat-card"><div class="stat-val">23</div><div class="stat-lbl">Communities</div></div>
+          <div class="stat-card"><div class="stat-val">17</div><div class="stat-lbl">Files Mapped</div></div>
+        </div>
+        <div class="card">
+          <div class="label">Highest Connected Nodes</div>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:0">
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:8px 0;border-bottom:1px solid rgba(0,200,255,0.07)">
+              <span style="color:var(--blue)">ask()</span><span class="text-sm">14 edges — central hub of the whole system</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:8px 0;border-bottom:1px solid rgba(0,200,255,0.07)">
+              <span style="color:var(--blue)">Sanitario Aluvia Plus</span><span class="text-sm">10 edges</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:8px 0">
+              <span style="color:var(--blue)">run_liability_radar()</span><span class="text-sm">9 edges</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card after-card">
+          <div class="label" style="color:rgba(0,255,136,0.5)">Key Architectural Insight</div>
+          <p class="text-sm mt-1">run_liability_radar() and query_products() both hit the same <strong style="color:var(--cyan)">_vectorstore global</strong> — the exact same ChromaDB engine underneath.</p>
+          <p class="text-sm mt-1">The liability radar is the DB query tool with a defect vs. service classification pass on top. Two separate-looking features, one engine.</p>
+        </div>
+        <div class="card">
+          <div class="label">What It's For</div>
+          <p class="text-sm mt-1">Built over our full codebase — 17 files, ~15k words. Used during development to understand architecture before touching anything. Not MAYA's runtime retrieval.</p>
+          <div style="margin-top:10px">
+            <span class="tag">graphify-out/graph.html</span>
+            <span class="tag">Interactive browser view</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SLIDE 9: MCP -->
+<div class="slide" data-slide="9">
+  <div class="blob" style="width:380px;height:380px;top:-65px;left:-50px;background:#7b3fff;opacity:0.065"></div>
+  <div class="content">
+    <div class="label">Model Context Protocol</div>
+    <h2 style="margin-bottom:22px">MCP Server — <span style="color:#c4a4ff">tools any AI can use</span></h2>
+    <div class="grid-2">
+      <div>
+        <div class="grid-2" style="margin-bottom:16px;gap:12px">
+          <div class="card before-card" style="padding:16px">
+            <div class="label" style="color:rgba(255,59,59,0.5)">Without MCP</div>
+            <p class="text-sm mt-1">Tools are hardcoded inside MAYA. Only MAYA can use them. Nothing else can access Corona product data.</p>
+          </div>
+          <div class="card after-card" style="padding:16px">
+            <div class="label" style="color:rgba(0,255,136,0.5)">With MCP</div>
+            <p class="text-sm mt-1">Tools live on a separate server. Any AI client can connect and call them — Claude Desktop, other agents.</p>
+          </div>
+        </div>
+        <div class="code-block" style="font-size:11px">
+<span class="cm"># Run the MCP server</span>
+python mcp_server.py
+
+<span class="cm"># Connects via stdio transport</span>
+<span class="cm"># Claude Desktop config already written</span>
+<span class="cm"># Any MCP client can connect</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;color:rgba(0,200,255,0.4);margin-bottom:10px">6 TOOLS EXPOSED</div>
+        <div class="tool-row"><span style="font-size:17px">🌤</span><div><strong style="font-size:13px">get_weather</strong></div></div>
+        <div class="tool-row"><span style="font-size:17px">🔍</span><div><strong style="font-size:13px">web_search</strong></div></div>
+        <div class="tool-row"><span style="font-size:17px">🗄️</span><div><strong style="font-size:13px">query_corona_products</strong></div></div>
+        <div class="tool-row"><span style="font-size:17px">📊</span><div><strong style="font-size:13px">generate_product_table</strong></div></div>
+        <div class="tool-row"><span style="font-size:17px">💬</span><div><strong style="font-size:13px">get_product_sentiment</strong></div></div>
+        <div class="tool-row"><span style="font-size:17px">💻</span><div><strong style="font-size:13px">execute_code</strong></div></div>
+        <div class="mt-2">
+          <span class="tag purple">fastmcp</span>
+          <span class="tag purple">stdio transport</span>
+          <span class="tag purple">Claude Desktop ready</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ SLIDE 10: DEMO -->
+<div class="slide" data-slide="10">
+  <div class="blob" style="width:460px;height:460px;top:-90px;right:-70px;background:#00ffe7;opacity:0.045"></div>
+  <div class="blob" style="width:300px;height:300px;bottom:-50px;left:-40px;background:#7b3fff;opacity:0.065;animation-duration:24s"></div>
+  <div class="content" style="display:flex;flex-direction:column;align-items:center">
+    <div class="label">Live Demo</div>
+    <h2 style="margin-bottom:8px;text-align:center">What we're about to <span style="color:var(--cyan)">show you</span></h2>
+    <p class="text-md" style="margin-bottom:28px;text-align:center">Customer mode only · localhost:8000 · real answers from actual product docs</p>
+    <div style="width:100%;max-width:700px">
+      <div class="demo-q">
+        <span class="demo-num">01</span>
+        "How is the weather today in Bogotá?"
+        <span class="tag" style="margin-left:auto;flex-shrink:0">Weather tool</span>
+      </div>
+      <div class="demo-q">
+        <span class="demo-num">02</span>
+        "What is the current price of the S&amp;P500?"
+        <span class="tag" style="margin-left:auto;flex-shrink:0">Web search</span>
+      </div>
+      <div class="demo-q">
+        <span class="demo-num">03</span>
+        "How do I install the Sanitario Nyren?"
+        <span class="tag green" style="margin-left:auto;flex-shrink:0">Vision OCR fix</span>
+      </div>
+      <div class="demo-q">
+        <span class="demo-num">04</span>
+        "What are the technical specifications of the Nyren?"
+        <span class="tag green" style="margin-left:auto;flex-shrink:0">Source filter</span>
+      </div>
+      <div class="demo-q">
+        <span class="demo-num">05</span>
+        "What are the maintenance instructions for the Aluvia Plus?"
+        <span class="tag green" style="margin-left:auto;flex-shrink:0">PRODUCT_MAP</span>
+      </div>
+    </div>
+    <div class="grid-2 mt-3" style="max-width:700px;width:100%;gap:12px">
+      <div class="card" style="padding:16px">
+        <div class="label">Stack</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
+          <span class="tag">FastAPI</span><span class="tag">LangGraph</span><span class="tag">ChromaDB</span>
+          <span class="tag">GPT-4o-mini</span><span class="tag">LangSmith</span>
+        </div>
+      </div>
+      <div class="card" style="padding:16px">
+        <div class="label">Data</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
+          <span class="tag green">221 reviews</span><span class="tag green">49 products</span>
+          <span class="tag green">1,100+ chunks</span><span class="tag green">Customer mode</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end deck -->
+
+<div class="nav">
+  <button class="nav-btn" onclick="changeSlide(-1)">‹</button>
+  <div class="dots" id="dots"></div>
+  <button class="nav-btn" onclick="changeSlide(1)">›</button>
+  <span class="nav-counter" id="counter">1 / 10</span>
+</div>
+
+<script>
+let current = 1;
+const total = document.querySelectorAll('.slide').length;
+const dotsEl = document.getElementById('dots');
+const counterEl = document.getElementById('counter');
+const slideNumEl = document.getElementById('slideNum');
+
+for (let i = 1; i <= total; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 1 ? ' active' : '');
+  d.onclick = () => goToSlide(i);
+  dotsEl.appendChild(d);
+}
+
+function goToSlide(n) {
+  const prev = document.querySelector('.slide.active');
+  if (prev) {
+    prev.classList.remove('active');
+    prev.classList.add('exit');
+    setTimeout(() => prev.classList.remove('exit'), 600);
+  }
+  const next = document.querySelector(`.slide[data-slide="${n}"]`);
+  if (next) next.classList.add('active');
+  current = n;
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === current));
+  counterEl.textContent = current + ' / ' + total;
+  slideNumEl.textContent = String(current).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
+}
+
+function changeSlide(dir) {
+  let n = current + dir;
+  if (n < 1) n = total;
+  if (n > total) n = 1;
+  goToSlide(n);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); changeSlide(1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); changeSlide(-1); }
+});
+
+let tx = 0;
+document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; });
+document.addEventListener('touchend', e => {
+  const diff = tx - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1);
+});
+</script>
+</body>
+</html>

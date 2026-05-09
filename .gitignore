@@ -1,0 +1,10 @@
+.env
+cert.pem
+key.pem
+chroma_db/
+graphify-out/
+feedback_log.csv
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
