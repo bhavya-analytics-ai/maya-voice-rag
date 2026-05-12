@@ -1,4 +1,4 @@
-# MAYA — Sprint 7 README
+# MAYA 
 
 ## What is MAYA
 AI chatbot for Corona (Colombia) toilet products. Answers customer questions using 1,100+ chunks of real product docs (PDFs, Word files) and reviews, with live web search, computer vision for seat cover matching, and a realtime voice interface.
